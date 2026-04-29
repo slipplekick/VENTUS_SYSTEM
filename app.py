@@ -160,8 +160,11 @@ def vault_insert(rows: list, source: str = 'reccobeats'):
     """
     if not rows: return
     clean = []
+    # Valid source labels — anything else defaults to 'reccobeats'
+    VALID_SOURCES = {'reccobeats', 'local_engine', 'spotify_af', 'audio_analysis'}
     for r in rows:
-        src = r.get('_source', source)
+        raw_src = r.get('_source', source)
+        src = raw_src if raw_src in VALID_SOURCES else source
         clean.append((
             str(r['id']),
             float(r.get('energy',0) or 0),
@@ -177,11 +180,10 @@ def vault_insert(rows: list, source: str = 'reccobeats'):
         ))
     try:
         with _db() as c:
-            # Protect Ghost Signal rows — never let reccobeats data overwrite local_engine.
-            # Split: local_engine rows always INSERT OR REPLACE (they ARE the authority).
-            # reccobeats rows use INSERT OR IGNORE if a local_engine row already exists.
-            ghost_rows = [r for r in clean if r[10] == 'local_engine']
-            rb_rows    = [r for r in clean if r[10] != 'local_engine']
+            # Protect Ghost Signal / Spotify-AF / Audio-Analysis rows — never let reccobeats overwrite them.
+            PROTECTED = {'local_engine', 'spotify_af', 'audio_analysis'}
+            ghost_rows = [r for r in clean if r[10] in PROTECTED]
+            rb_rows    = [r for r in clean if r[10] not in PROTECTED]
 
             if ghost_rows:
                 c.executemany("""INSERT OR REPLACE INTO vault
@@ -190,10 +192,11 @@ def vault_insert(rows: list, source: str = 'reccobeats'):
                     VALUES (?,?,?,?,?,?,?,?,?,?,?)""", ghost_rows)
 
             if rb_rows:
-                # Only insert if no local_engine row exists for this id
-                existing_ghost = {r[0] for r in c.execute(
-                    "SELECT id FROM vault WHERE source='local_engine'").fetchall()}
-                safe_rb = [r for r in rb_rows if r[0] not in existing_ghost]
+                # Only insert if no protected row exists for this id
+                existing_protected = {r[0] for r in c.execute(
+                    f"SELECT id FROM vault WHERE source IN ({','.join(['?']*len(PROTECTED))})",
+                    list(PROTECTED)).fetchall()}
+                safe_rb = [r for r in rb_rows if r[0] not in existing_protected]
                 if safe_rb:
                     c.executemany("""INSERT OR REPLACE INTO vault
                         (id,energy,valence,danceability,bpm,acousticness,
@@ -422,11 +425,18 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
     """
     _gs("METADATA MISSING — INITIATING DEEP SCAN")
     try:
-        tr = requests.get(f"{get_api()}/tracks/{track_id}",
+        # Try market=US first — regional licensing often reveals preview_url hidden in local market
+        tr = requests.get(f"{get_api()}/tracks/{track_id}?market=US",
                           headers={"Authorization":f"Bearer {token}"}, timeout=10)
         if tr.status_code != 200:
             _gs(f"TRACK LOOKUP FAILED ({tr.status_code}) — CANNOT ANALYZE"); return None
         preview_url = tr.json().get('preview_url')
+        # If US market had no preview, try without market param (local market)
+        if not preview_url:
+            tr2 = requests.get(f"{get_api()}/tracks/{track_id}",
+                               headers={"Authorization":f"Bearer {token}"}, timeout=10)
+            if tr2.status_code == 200:
+                preview_url = tr2.json().get('preview_url')
     except Exception as e:
         _gs(f"TRACK FETCH ERROR: {e}"); return None
 
@@ -495,17 +505,129 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
             try: os.remove(audio_path)
             except: pass
 
-# ── SHARED 4-TIER RESOLVER ────────────────────────────────────────────────────
+# ── SPOTIFY AUDIO-FEATURES DIRECT (fallback tier 2) ──────────────────────────
+def fetch_spotify_audio_features(track_id: str, token: str) -> dict | None:
+    """
+    Call Spotify /audio-features/{id} directly — bypasses ReccoBeats entirely.
+    Returns normalised feature dict (same schema as fetch_reccobeats) or None.
+    Works for almost every track in Spotify's catalog, including niche/indie.
+    """
+    if not token: return None
+    try:
+        res = requests.get(f"{get_api()}/audio-features/{track_id}",
+                           headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        if res.status_code != 200:
+            print(f"[SPOTIFY-AF] {track_id}: {res.status_code}"); return None
+        d = res.json()
+        if not d or d.get('error'): return None
+        e   = d.get('energy',       0) or 0
+        v   = d.get('valence',      0) or 0
+        dn  = d.get('danceability', 0) or 0
+        ac  = d.get('acousticness', 0) or 0
+        ins = d.get('instrumentalness', 0) or 0
+        return {
+            'energy':           round(e   * 100 if e   <= 1.0 else e,   4),
+            'valence':          round(v   * 100 if v   <= 1.0 else v,   4),
+            'danceability':     round(dn  * 100 if dn  <= 1.0 else dn,  4),
+            'bpm':              round(d.get('tempo', 0) or 0,           3),
+            'acousticness':     round(ac  * 100 if ac  <= 1.0 else ac,  4),
+            'instrumentalness': round(ins * 100 if ins <= 1.0 else ins, 4),
+            'loudness':         round(d.get('loudness', 0) or 0,        3),
+            'key':              int(d.get('key',  -1) if d.get('key')  is not None else -1),
+            'mode':             int(d.get('mode',  1) if d.get('mode') is not None else  1),
+        }
+    except Exception as e:
+        print(f"[SPOTIFY-AF] exception: {e}"); return None
+
+
+# ── SPOTIFY AUDIO-ANALYSIS DERIVE (fallback tier 3, nuclear) ─────────────────
+def derive_from_audio_analysis(track_id: str, token: str) -> dict | None:
+    """
+    Use Spotify /audio-analysis/{id} (full low-level acoustic data) to
+    compute energy, BPM, loudness, valence, danceability, acousticness.
+    No preview URL needed — Spotify performs this on their own masters.
+    Covers virtually every track in the catalog including niche/indie/new.
+    """
+    if not token: return None
+    try:
+        res = requests.get(f"{get_api()}/audio-analysis/{track_id}",
+                           headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        if res.status_code != 200:
+            print(f"[AUDIO-ANALYSIS] {track_id}: {res.status_code}"); return None
+        d = res.json()
+        if not d: return None
+
+        # Top-level track summary
+        track_summary = d.get('track', {})
+        bpm      = float(track_summary.get('tempo', 0) or 0)
+        loudness = float(track_summary.get('loudness', -10) or -10)
+        key      = int(track_summary.get('key', -1) if track_summary.get('key') is not None else -1)
+        mode     = int(track_summary.get('mode', 1) if track_summary.get('mode') is not None else 1)
+
+        # Segments contain timbre and pitch arrays — derive energy/valence/dance from them
+        segments = d.get('segments', [])
+        if segments:
+            # Energy: mean loudness normalised to 0-100
+            seg_lounds = [s.get('loudness_max', s.get('loudness_start', -30)) for s in segments]
+            mean_loud  = sum(seg_lounds) / len(seg_lounds)
+            energy     = min(100.0, max(0.0, ((mean_loud + 60) / 60) * 100))
+
+            # Valence: timbre[1] (brightness) correlates with perceived positivity
+            timbres = [s.get('timbre', []) for s in segments if s.get('timbre')]
+            if timbres:
+                brightness = [t[1] for t in timbres if len(t) > 1]
+                mean_bright = sum(brightness) / len(brightness) if brightness else 0
+                valence = min(100.0, max(0.0, (mean_bright + 100) / 2.0))
+            else:
+                valence = 50.0
+
+            # Danceability: derived from tempo confidence and beat regularity
+            beats = d.get('beats', [])
+            if len(beats) > 1:
+                beat_durs = [beats[i+1]['start'] - beats[i]['start'] for i in range(len(beats)-1)]
+                import statistics
+                beat_var  = statistics.stdev(beat_durs) if len(beat_durs) > 1 else 1.0
+                dance     = min(100.0, max(0.0, 100 - beat_var * 200))
+            else:
+                dance = 60.0
+
+            # Acousticness: tracks with many segments at low loudness tend to be acoustic
+            acousticness = min(100.0, max(0.0, max(0, -mean_loud - 5) * 3))
+
+        else:
+            # No segments — use summary-level fallbacks
+            energy = min(100.0, max(0.0, ((loudness + 60) / 60) * 100))
+            valence = 50.0; dance = 60.0; acousticness = 15.0
+
+        print(f"[AUDIO-ANALYSIS] {track_id}: BPM:{bpm:.0f} NRG:{energy:.0f}% LOUD:{loudness:.1f}")
+        return {
+            'energy':           round(energy, 4),
+            'valence':          round(valence, 4),
+            'danceability':     round(dance, 4),
+            'bpm':              round(bpm, 3),
+            'acousticness':     round(acousticness, 4),
+            'instrumentalness': 0.0,
+            'loudness':         round(loudness, 3),
+            'key':              key,
+            'mode':             mode,
+        }
+    except Exception as e:
+        print(f"[AUDIO-ANALYSIS] exception: {e}"); return None
+
+
+# ── SHARED 5-TIER RESOLVER ────────────────────────────────────────────────────
 def resolve_features(track_id: str, token: str | None = None,
                      allow_ghost: bool = True) -> tuple:
     """
     Returns (feat_dict | None, method_label, source_label).
 
     Resolution order:
-      1. SQLite vault  — instant, no network
-      2. ReccoBeats    — batch API (skipped if track is in FAILED_TRACKS)
-      3. Ghost Signal  — librosa local analysis (skipped if allow_ghost=False)
-      4. void          — nothing worked; track added to FAILED_TRACKS
+      1. SQLite vault            — instant, no network
+      2. ReccoBeats              — batch API
+      3. Spotify audio-features  — direct Spotify endpoint (covers niche tracks RB misses)
+      4. Ghost Signal            — librosa local analysis from preview MP3
+      5. Audio-analysis derive   — compute metrics from Spotify's full track analysis
+      6. void                    — nothing worked; track added to FAILED_TRACKS
     """
     # 1. Vault hit — fastest path
     feat = vault_get(track_id)
@@ -522,14 +644,28 @@ def resolve_features(track_id: str, token: str | None = None,
         vault_insert([{'id': track_id, **feat}])
         return feat, "RECCOBEATS API", "api"
 
-    # 4. Ghost Signal Decryption (librosa local analysis from preview audio)
+    # 4. Spotify audio-features direct (most complete coverage, incl. niche tracks)
+    if token:
+        feat = fetch_spotify_audio_features(track_id, token)
+        if feat:
+            vault_insert([{'id': track_id, '_source': 'spotify_af', **feat}])
+            return feat, "SPOTIFY AUDIO-FEATURES", "spotify_af"
+
+    # 5. Ghost Signal Decryption (librosa local analysis from preview audio)
     if allow_ghost and token:
         feat = decrypt_ghost_signal(track_id, token)
         if feat:
-            vault_insert([{'id': track_id, **feat}])
+            vault_insert([{'id': track_id, **feat}])  # feat already has '_source': 'local_engine'
             return {k: v for k, v in feat.items() if k != '_source'}, "LOCAL ACOUSTIC ENGINE", "ghost_decrypted"
 
-    # 5. All tiers exhausted — cache the failure to avoid future retries
+    # 6. Audio-analysis derive — nuclear fallback, no preview needed
+    if token:
+        feat = derive_from_audio_analysis(track_id, token)
+        if feat:
+            vault_insert([{'id': track_id, '_source': 'audio_analysis', **feat}])
+            return feat, "AUDIO ANALYSIS DERIVED", "audio_analysis"
+
+    # 7. All tiers exhausted — cache the failure to avoid future retries
     FAILED_TRACKS.add(track_id)
     return None, "NO SIGNAL", "void"
 
@@ -546,6 +682,27 @@ def fetch_playlist_tracks(playlist_id, token, fields=None):
         items.extend(body.get('items',[]))
         url = body.get('next')
     return items
+
+# ── BACKGROUND AUTO-VAULT THREAD ──────────────────────────────────────────────
+# Silently resolves features for the currently-playing track every time it
+# changes. Vaults the result so it's available instantly for scoring.
+_last_auto_vaulted: str | None = None
+
+def _auto_vault_track(track_id: str, token: str):
+    """Called in a daemon thread — silently vaults a track without blocking SSE."""
+    global _last_auto_vaulted
+    if track_id == _last_auto_vaulted:
+        return
+    # Check vault first — if already there, nothing to do
+    if vault_get(track_id):
+        _last_auto_vaulted = track_id
+        return
+    _last_auto_vaulted = track_id
+    feat, method, _ = resolve_features(track_id, token=token, allow_ghost=True)
+    if feat:
+        print(f"[AUTO-VAULT] {track_id[:18]} → {method}", flush=True)
+        _sse_broadcast("vault_updated", {"track_id": track_id, "method": method})
+
 
 # ── NOW-PLAYING POLLER ────────────────────────────────────────────────────────
 def _now_playing_poller():
@@ -571,7 +728,11 @@ def _now_playing_poller():
                             "duration_ms":item.get('duration_ms',0),
                             "track_changed":(cid!=last_id),
                         })
+                        track_changed = (cid != last_id)
                         last_id = cid
+                        # Silently vault every new track using all 5 resolver tiers
+                        if track_changed:
+                            threading.Thread(target=_auto_vault_track, args=(cid, token), daemon=True).start()
                     else:
                         if last_id is not None:
                             _sse_broadcast("now_playing",{"is_playing":False})
@@ -580,6 +741,89 @@ def _now_playing_poller():
         time.sleep(3)
 
 threading.Thread(target=_now_playing_poller, daemon=True).start()
+
+# ── BACKGROUND PLAYLIST AUTO-SYNC ────────────────────────────────────────────
+_autosync_playlist_id: str | None = None
+_autosync_interval:    int        = 300  # seconds (5 min default)
+
+def _playlist_autosync_worker():
+    """Background thread — re-syncs taste profile playlist periodically."""
+    global _autosync_playlist_id
+    while True:
+        time.sleep(_autosync_interval)
+        pid = _autosync_playlist_id
+        if not pid:
+            continue
+        try:
+            token = get_spotify_token()
+            if not token:
+                continue
+            all_items = fetch_playlist_tracks(pid, token,
+                fields="items(item(id,name,artists),track(id,name,artists)),next")
+            master_path = os.path.join(_HERE, 'master_vibe_training_set.csv')
+            try:
+                df = pd.read_csv(master_path)
+            except Exception:
+                continue
+            id_col = find_col(df, ['spotify track id', 'track id', 'id'])
+            if not id_col:
+                continue
+            existing = set(df[id_col].dropna().astype(str))
+            new_ids = []
+            track_meta = {}
+            for pl in all_items:
+                t = pl.get('item') or pl.get('track')
+                if t and t.get('id') and t['id'] not in existing:
+                    new_ids.append(t['id']); track_meta[t['id']] = t
+            if new_ids:
+                print(f"[AUTO-SYNC] {len(new_ids)} new tracks detected — syncing…", flush=True)
+                n_col  = find_col(df, ['song','name','track'], exclude=[id_col])
+                a_col  = find_col(df, ['artist'])
+                dt_col = find_col(df, ['added at','date']) or 'Added At'
+                e_col  = find_col(df, ['energy'])   or 'Energy'
+                v_col  = find_col(df, ['valence'])  or 'Valence'
+                d_col  = find_col(df, ['dance'])    or 'Danceability'
+                b_col  = find_col(df, ['bpm','tempo']) or 'BPM'
+                ac_col = find_col(df, ['acoustic']) or 'Acousticness'
+                in_col = find_col(df, ['instrument']) or 'Instrumentalness'
+                lo_col = find_col(df, ['loud'])     or 'Loudness'
+                k_col  = find_col(df, ['camelot','key']) or 'Camelot'
+                new_rows = []
+                for i in range(0, len(new_ids), 40):
+                    chunk = new_ids[i:i+40]
+                    bd    = fetch_reccobeats_batch(chunk)
+                    for tid in chunk:
+                        meta = track_meta[tid]; feat = bd.get(tid, {})
+                        rd = {id_col: tid, dt_col: datetime.now().strftime('%Y-%m-%d')}
+                        if n_col: rd[n_col] = meta.get('name', '')
+                        if a_col: rd[a_col] = meta['artists'][0]['name'] if meta.get('artists') else ''
+                        if feat:
+                            rd[e_col]  = feat.get('energy', 0)
+                            rd[v_col]  = feat.get('valence', 0)
+                            rd[d_col]  = feat.get('danceability', 0)
+                            rd[b_col]  = feat.get('bpm', 0)
+                            rd[ac_col] = feat.get('acousticness', 0)
+                            rd[in_col] = feat.get('instrumentalness', 0)
+                            rd[lo_col] = feat.get('loudness', 0)
+                            rd[k_col]  = get_camelot(feat.get('key', -1), feat.get('mode', 1))
+                        new_rows.append(rd)
+                if new_rows:
+                    pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True).to_csv(master_path, index=False)
+                    vault_rows = [{'id': rd[id_col], **{k: v for k, v in rd.items()
+                        if k not in (id_col, dt_col, n_col, a_col, k_col)}}
+                        for rd in new_rows if rd.get(e_col) or rd.get(b_col)]
+                    if vault_rows:
+                        vault_insert(vault_rows)
+                    _sse_broadcast("system_warning", {
+                        "type": "PLAYLIST_UPDATED",
+                        "message": f"Playlist auto-synced — {len(new_rows)} new tracks added."
+                    })
+                    global TASTE_PROFILE
+                    TASTE_PROFILE = get_taste_profile()
+        except Exception as e:
+            print(f"[AUTO-SYNC] error: {e}", flush=True)
+
+threading.Thread(target=_playlist_autosync_worker, daemon=True).start()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ROUTES
@@ -669,15 +913,18 @@ def get_vault_data():
     for _,r in df.iterrows():
         out.append({
             "id":str(r.get('id','')),
-            "energy":round(float(r.get('energy',0))),
-            "valence":round(float(r.get('valence',0))),
-            "danceability":round(float(r.get('danceability',0))),
-            "bpm":round(float(r.get('bpm',0))),
-            "acousticness":round(float(r.get('acousticness',0))),
-            "instrumentalness":round(float(r.get('instrumentalness',0))),
-            "loudness":round(float(r.get('loudness',0)),1),
+            # Preserve float precision — rounding kills librosa's values like 63.4 energy
+            "energy":round(float(r.get('energy',0)),2),
+            "valence":round(float(r.get('valence',0)),2),
+            "danceability":round(float(r.get('danceability',0)),2),
+            "bpm":round(float(r.get('bpm',0)),2),
+            "acousticness":round(float(r.get('acousticness',0)),2),
+            "instrumentalness":round(float(r.get('instrumentalness',0)),2),
+            "loudness":round(float(r.get('loudness',0)),2),
             "key":int(r.get('key',-1) or -1),
             "mode":int(r.get('mode',1) or 1),
+            # source field — 'local_engine' for Ghost Signal (librosa), 'reccobeats' otherwise
+            "source":str(r.get('source','reccobeats') or 'reccobeats'),
         })
     return jsonify(out)
 
@@ -880,8 +1127,27 @@ def sync_playlist():
         if vault_rows:
             vault_insert(vault_rows)
             print(f"[SYNC] Pushed {len(vault_rows)}/{len(new_rows)} rows to vault")
+
+        # Background-resolve any tracks ReccoBeats missed (zeros) via all fallback tiers
+        ghost_ids = [rd.get(id_col,'') for rd in new_rows
+                     if not (rd.get(e_col) or rd.get(b_col)) and rd.get(id_col,'')]
+        if ghost_ids:
+            def _bg_resolve_ghosts(ids, tok):
+                resolved = 0
+                for tid in ids:
+                    if vault_get(tid): continue
+                    feat, method, _ = resolve_features(tid, token=tok, allow_ghost=True)
+                    if feat:
+                        resolved += 1
+                        print(f"[SYNC-BG] {tid[:18]} resolved via {method}", flush=True)
+                print(f"[SYNC-BG] Done — {resolved}/{len(ids)} ghost tracks resolved", flush=True)
+                _sse_broadcast("vault_updated", {"msg": f"Background resolved {resolved}/{len(ids)} ghost tracks"})
+            _bg_tok = get_spotify_token()
+            threading.Thread(target=_bg_resolve_ghosts, args=(ghost_ids, _bg_tok), daemon=True).start()
+            print(f"[SYNC] {len(ghost_ids)} ghost tracks queued for background resolution", flush=True)
+
         return jsonify({"success":True,"added":len(new_rows),
-            "message":f"SYNC COMPLETE — {len(new_rows)} new track(s) added with audio features."})
+            "message":f"SYNC COMPLETE — {len(new_rows)} new track(s) added. {len(ghost_ids)} ghost tracks resolving in background."})
     return jsonify({"success":True,"added":0,"message":"SIGNAL ALIGNED — no new tracks detected."})
 
 # ── SYNC VAULT FROM PLAYLIST ──────────────────────────────────────────────────
@@ -1073,12 +1339,22 @@ def track_info():
         item   = res.json()
         images = item.get('album', {}).get('images', [])
         feat   = vault_get(tid)
+        # Also try market=US for preview_url (regional unlock)
+        preview = item.get('preview_url')
+        if not preview:
+            try:
+                r2 = requests.get(f"{get_api()}/tracks/{tid}?market=US",
+                                  headers={"Authorization": f"Bearer {token}"}, timeout=8)
+                if r2.status_code == 200:
+                    preview = r2.json().get('preview_url')
+            except: pass
         return jsonify({
-            "id":        tid,
-            "name":      item.get('name', ''),
-            "artist":    item['artists'][0]['name'] if item.get('artists') else 'Unknown',
-            "album_art": images[0]['url'] if images else None,
-            "camelot":   get_camelot(feat['key'], feat['mode']) if feat else '--',
+            "id":          tid,
+            "name":        item.get('name', ''),
+            "artist":      item['artists'][0]['name'] if item.get('artists') else 'Unknown',
+            "album_art":   images[0]['url'] if images else None,
+            "camelot":     get_camelot(feat['key'], feat['mode']) if feat else '--',
+            "preview_url": preview,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1120,7 +1396,8 @@ def backfill_vault():
         with _db() as c:
             rows_db = c.execute("SELECT id, source FROM vault").fetchall()
             existing        = {r['id'] for r in rows_db}
-            ghost_protected = {r['id'] for r in rows_db if r['source'] == 'local_engine'}
+            _PROTECTED_SOURCES = {'local_engine', 'spotify_af', 'audio_analysis'}
+            ghost_protected = {r['id'] for r in rows_db if r['source'] in _PROTECTED_SOURCES}
     except: pass
 
     vault_rows = []
@@ -1175,6 +1452,101 @@ def backfill_vault():
                     f"{skipped_null} null-metric tracks skipped. "
                     f"{already_in} already cached.")
     })
+
+
+@app.route('/api/rescan_ghosts', methods=['POST'])
+def rescan_ghosts():
+    """
+    Streaming SSE endpoint.
+    Reads master CSV, finds tracks with energy=0 AND bpm=0 (GHOST / no ReccoBeats data),
+    checks if they have a Spotify preview URL, runs Ghost Signal (librosa) on each,
+    and stores the result as local_engine in the vault.
+    Streams progress events so the frontend can show a live log.
+    """
+    token = get_spotify_token()
+    if not token:
+        return jsonify({"error": "Spotify auth failed"}), 401
+
+    master_path = os.path.join(_HERE, 'master_vibe_training_set.csv')
+    try:
+        df = pd.read_csv(master_path).fillna("")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    id_col = find_col(df, ['spotify track id', 'track id', 'id'])
+    e_col  = find_col(df, ['energy'])
+    b_col  = find_col(df, ['bpm', 'tempo'])
+    if not id_col:
+        return jsonify({"error": "Cannot find ID column in CSV"}), 500
+
+    ghost_ids = []
+    for _, r in df.iterrows():
+        tid = str(r.get(id_col, '')).strip()
+        if not tid: continue
+        try:
+            e = float(r.get(e_col, 0) or 0) if e_col else 0.0
+            b = float(r.get(b_col, 0) or 0) if b_col else 0.0
+        except: e, b = 0.0, 0.0
+        if e == 0.0 and b == 0.0:
+            ghost_ids.append(tid)
+
+    if ghost_ids:
+        ph = ",".join("?" * len(ghost_ids))
+        with _db() as c:
+            already_gs = {r[0] for r in c.execute(
+                f"SELECT id FROM vault WHERE id IN ({ph}) AND source='local_engine'",
+                ghost_ids).fetchall()}
+        ghost_ids = [tid for tid in ghost_ids if tid not in already_gs]
+
+    def stream():
+        total      = len(ghost_ids)
+        success    = 0
+        no_preview = 0
+        failed     = 0
+
+        yield f"event: progress\ndata: {json.dumps({'msg': f'GHOST RESCAN INITIATED — {total} tracks queued for analysis', 'done': 0, 'total': total})}\n\n"
+
+        if total == 0:
+            yield f"event: done\ndata: {json.dumps({'msg': 'NO GHOST TRACKS — all tracks already have data.', 'success': 0, 'no_preview': 0, 'failed': 0, 'vault_total': vault_count()})}\n\n"
+            return
+
+        for i, tid in enumerate(ghost_ids):
+            feat = decrypt_ghost_signal(tid, token)
+            if feat is None:
+                # Tier 2: try Spotify audio-features direct
+                feat = fetch_spotify_audio_features(tid, token)
+                if feat:
+                    feat['_source'] = 'spotify_af'  # direct Spotify AF data
+                    vault_insert([{'id': tid, **feat}])
+                    success += 1
+                    msg = (f"[{i+1}/{total}] SPOTIFY-AF — "
+                           f"BPM:{feat.get('bpm',0):.0f} NRG:{feat.get('energy',0):.0f}%")
+                else:
+                    # Tier 3: audio-analysis nuclear fallback
+                    feat = derive_from_audio_analysis(tid, token)
+                    if feat:
+                        vault_insert([{'id': tid, **feat}])
+                        success += 1
+                        msg = (f"[{i+1}/{total}] ANALYSIS-DERIVED — "
+                               f"BPM:{feat.get('bpm',0):.0f} NRG:{feat.get('energy',0):.0f}%")
+                    else:
+                        failed += 1
+                        msg = f"[{i+1}/{total}] ALL TIERS FAILED — {tid[:18]}..."
+            else:
+                vault_insert([{'id': tid, **feat}])
+                success += 1
+                msg = (f"[{i+1}/{total}] DECRYPTED — "
+                       f"BPM:{feat.get('bpm',0):.0f} NRG:{feat.get('energy',0):.0f}% "
+                       f"KEY:{get_camelot(feat.get('key',-1), feat.get('mode',1))}")
+
+            yield f"event: progress\ndata: {json.dumps({'msg': msg, 'done': i+1, 'total': total})}\n\n"
+
+        summary = (f"RESCAN COMPLETE — {success} tracks resolved (Ghost Signal / Spotify-AF / Analysis). "
+                   f"{failed} tracks truly unresolvable.")
+        yield f"event: done\ndata: {json.dumps({'msg': summary, 'success': success, 'no_preview': 0, 'failed': failed, 'vault_total': vault_count()})}\n\n"
+
+    return Response(stream(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
 @app.route('/api/rebuild_dna', methods=['POST'])
@@ -1325,6 +1697,30 @@ def get_top():
                     "followers":item.get('followers',{}).get('total',0)})
         return jsonify(out)
     except Exception as e: return jsonify({"error":str(e)}),500
+
+# ── PLAYLIST AUTO-SYNC CONTROL ────────────────────────────────────────────────
+@app.route('/api/set_autosync', methods=['POST'])
+def set_autosync():
+    global _autosync_playlist_id, _autosync_interval
+    data = request.json or {}
+    pid = data.get('playlist_id', '').strip()
+    interval = int(data.get('interval_seconds', 300))
+    _autosync_playlist_id = pid if pid else None
+    _autosync_interval    = max(60, interval)
+    return jsonify({
+        "success": True,
+        "playlist_id": _autosync_playlist_id,
+        "interval_seconds": _autosync_interval,
+        "message": f"Auto-sync {'ENABLED for playlist ' + pid if pid else 'DISABLED'}."
+    })
+
+@app.route('/api/autosync_status')
+def autosync_status():
+    return jsonify({
+        "enabled":          bool(_autosync_playlist_id),
+        "playlist_id":      _autosync_playlist_id or '',
+        "interval_seconds": _autosync_interval,
+    })
 
 # ── BOOT ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':

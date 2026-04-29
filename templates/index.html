@@ -998,11 +998,7 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
         </div>
 
         <div class="toggle-wrap">
-            <span>AUTO-ANALYZE</span>
-            <label class="switch">
-                <input type="checkbox" id="autoAnalyzeToggle" onchange="toggleAutoAnalyze(this)">
-                <span class="slider"></span>
-            </label>
+            <span style="color:var(--dim);font-size:10px">⬤ SILENT ANALYSIS — always on</span>
         </div>
         <div class="toggle-wrap">
             <span>AUTO-ADD ≥ <span id="autoAddThreshLabel">75</span>%</span>
@@ -1030,6 +1026,16 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
             value="1rxvJh0wWgia4ylocdC42Y"
             placeholder="Paste playlist ID…"
             style="margin-bottom:8px;font-size:11px;padding:8px 10px;display:none">
+
+        <!-- Auto-sync toggle -->
+        <div class="toggle-wrap" style="margin-top:4px">
+            <span>PLAYLIST AUTO-SYNC</span>
+            <label class="switch">
+                <input type="checkbox" id="autoSyncToggle" onchange="toggleAutoSync(this)">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div id="autoSyncStatus" style="font-size:9px;color:var(--dim);padding:2px 0 6px;display:none">◈ Syncing every 5 min</div>
 
         <!-- ═══ CUSTOM PROMPT MODAL ═══ -->
         <div id="customPromptOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.92);z-index:10000;align-items:center;justify-content:center">
@@ -1189,7 +1195,9 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
                 <option value="loudness_desc">LOUDNESS: HIGH → LOW</option>
             </select>
             <button class="sys-btn" id="backfillBtn" onclick="backfillVault()" style="white-space:nowrap">⬆ BACKFILL VAULT</button>
+            <button class="sys-btn" id="rescanBtn" onclick="rescanGhosts()" style="white-space:nowrap;border-color:var(--quincy);color:var(--quincy)">◈ RESCAN GHOSTS</button>
         </div>
+        <div id="rescanLog" style="display:none;background:rgba(0,0,0,0.5);border:1px solid var(--quincy);margin:8px 0;padding:10px 14px;font-size:10px;color:var(--quincy);font-family:var(--mono);max-height:160px;overflow-y:auto;line-height:1.7"></div>
         <div class="list-header" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
             <div>#</div><div>TRACK</div><div>KEY</div>
             <div>NRG</div><div>VAL</div><div>DNC</div><div>BPM</div><div>VERDICT SCORE</div>
@@ -1407,6 +1415,14 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
 // ═══════════════════════════════════════════════════════════ STATE ═══
 let currentId            = null;
 let currentTrackObj      = null;
+// ── STORAGE SHIM — works in Electron where localStorage may be blocked ─────
+const _memStore = {};
+const _store = {
+    getItem:    (k) => { try { return localStorage.getItem(k); } catch(e) { return _memStore[k] ?? null; } },
+    setItem:    (k,v) => { try { localStorage.setItem(k,v); } catch(e) {} _memStore[k] = v; },
+    removeItem: (k) => { try { localStorage.removeItem(k); } catch(e) {} delete _memStore[k]; },
+};
+
 let vibeProfile          = {};
 let tracks               = [];
 let vaultData            = [];
@@ -1806,7 +1822,7 @@ async function loadData() {
                     <div class="col-score ${vc}">${score}%</div>
                 </div>`;
             }).join('')
-            + (ghostCount > 0 ? `<div class="empty-state" style="color:var(--dim);font-size:10px;padding:8px 16px">↑ ${ghostCount} GHOST track${ghostCount>1?'s':''} — no Spotify preview available (niche/new release)</div>` : '')
+            + (ghostCount > 0 ? `<div class="empty-state" style="color:var(--quincy);font-size:10px;padding:8px 16px;cursor:pointer" onclick="rescanGhosts()" title="Click to run full multi-tier rescan">◈ ${ghostCount} GHOST track${ghostCount>1?'s':''} — unresolved. Click "RESCAN GHOSTS" to try Ghost Signal → Spotify AF → Audio Analysis.</div>` : '')
             || '<div class="empty-state">No tracks loaded. Check Flask server.</div>';
         } catch(e) { console.error('trackList render', e); }
 
@@ -1914,7 +1930,9 @@ function renderVault() {
     let vaultIdx = 0;
     const html = filtered.map(t => {
         const isNoData   = t.energy === 0 && t.bpm === 0;
-        const isGhostSig = t.source === 'local_engine';  // librosa Ghost Signal data — real metrics!
+        const isGhostSig    = t.source === 'local_engine';   // librosa Ghost Signal — real metrics
+        const isSpotifyAF   = t.source === 'spotify_af';     // Spotify audio-features direct
+        const isAudioAnal   = t.source === 'audio_analysis'; // derived from audio-analysis
         const rowNum     = ++vaultIdx;
         if (isNoData) return `
         <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;opacity:0.45">
@@ -1935,6 +1953,10 @@ function renderVault() {
         // Ghost Signal rows: real librosa data but scored from local audio engine, not ReccoBeats
         const ghostSigBadge = isGhostSig
             ? ` <span class="phase-tag" style="border-color:var(--quincy);color:var(--quincy);font-size:9px">GHOST SIG</span>`
+            : isSpotifyAF
+            ? ` <span class="phase-tag" style="border-color:var(--neon);color:var(--neon);font-size:9px">SPOTIFY AF</span>`
+            : isAudioAnal
+            ? ` <span class="phase-tag" style="border-color:#a78bfa;color:#a78bfa;font-size:9px">DERIVED</span>`
             : '';
         return `
         <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
@@ -2172,12 +2194,68 @@ async function syncMasterPlaylist() {
 
 // ═══════════════════════════════════════════════════════════ SCORER ═══
 
+// autoAnalyzeEnabled = true  → triggers full scorer UI + auto-add on each track change
+// autoAnalyzeEnabled = false → silent background vault-score only (no UI, no auto-add)
+// Silent analysis ALWAYS runs on track change regardless of this toggle.
 function toggleAutoAnalyze(el) {
     autoAnalyzeEnabled = el.checked;
+    showToast(autoAnalyzeEnabled
+        ? '// AUTO-ADD MODE: scoring every track + auto-adding matches'
+        : '// SILENT MODE: background vaulting only', 'info');
     if (autoAnalyzeEnabled && currentId) {
         const h = historyLog.find(x => x.id === currentId);
         if (h && (h.verdict === 'UNRATED' || h.verdict === 'ERROR')) triggerScore(false);
     }
+}
+
+async function toggleAutoSync(el) {
+    const pid = (document.getElementById('autoAddPlaylistId')?.value || '').trim()
+             || (document.getElementById('autoAddPlaylistPreset')?.value !== 'custom'
+                 ? document.getElementById('autoAddPlaylistPreset')?.value : '') || '';
+    const statusEl = document.getElementById('autoSyncStatus');
+    if (el.checked) {
+        if (!pid) {
+            showToast('// AUTO-SYNC: set a target playlist first', 'warn');
+            el.checked = false;
+            return;
+        }
+        try {
+            await fetch('/api/set_autosync', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({playlist_id: pid, interval_seconds: 300})
+            });
+            if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = `◈ Syncing ${pid.slice(0,12)}… every 5 min`; }
+            showToast('// PLAYLIST AUTO-SYNC ENABLED', 'ok');
+        } catch(e) { showToast('// AUTO-SYNC ERROR', 'error'); el.checked = false; }
+    } else {
+        await fetch('/api/set_autosync', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({playlist_id: ''})});
+        if (statusEl) statusEl.style.display = 'none';
+        showToast('// PLAYLIST AUTO-SYNC DISABLED', 'warn');
+    }
+}
+
+// Silent background score — vaults the track and updates session log without
+// switching to the scorer page or showing any UI. Used for passive analysis.
+async function silentVaultScore(trackId) {
+    if (!trackId) return;
+    try {
+        const res = await fetch('/api/score_track', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({track_id: trackId})
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        // Update session log entry with the score
+        const h = historyLog.find(x => x.id === trackId);
+        if (h && data.score !== null) {
+            h.score   = data.score;
+            h.verdict = data.verdict;
+            h.method  = data.method || 'SILENT SCAN';
+            renderHistory();
+        }
+    } catch(e) { /* silent fail */ }
 }
 
 async function triggerScore(isManual = true) {
@@ -2239,7 +2317,12 @@ async function triggerScore(isManual = true) {
         document.getElementById('verdictLabel').className   = 'verdict ' + vc;
         const methodSuffix = data.camelot && data.camelot !== '--' ? ` · KEY ${data.camelot}` : '';
         const ghostBadge   = data.source === 'ghost_decrypted'
-            ? ' <span style="color:var(--bankai);font-size:10px">⚡ LOCAL ANALYSIS</span>' : '';
+            ? ' <span style="color:var(--bankai);font-size:10px">⚡ LOCAL ANALYSIS</span>'
+            : data.source === 'spotify_af'
+            ? ' <span style="color:var(--neon);font-size:10px">⚡ SPOTIFY AF</span>'
+            : data.source === 'audio_analysis'
+            ? ' <span style="color:#a78bfa;font-size:10px">⚡ DERIVED</span>'
+            : '';
         document.getElementById('methodLabel').innerHTML = `// ${data.method}${methodSuffix}${ghostBadge}`;
 
         // Album art in scorer sidebar
@@ -2429,7 +2512,13 @@ function handleNowPlaying(data) {
             if (historyLog.length > 50) historyLog.pop();
             renderHistory();
 
-            if (autoAnalyzeEnabled) setTimeout(() => triggerScore(false), 2000);
+            if (autoAnalyzeEnabled) {
+                // Auto-add mode: score with full UI + auto-add logic
+                setTimeout(() => triggerScore(false), 2000);
+            } else {
+                // Silent mode: always vault-score in background (no UI, no auto-add)
+                setTimeout(() => silentVaultScore(currentId), 2500);
+            }
 
             // Auto-refresh queue when track changes (new song = new queue order)
             if (document.getElementById('page-queue')?.classList.contains('active')) {
@@ -2502,10 +2591,25 @@ function startSSE() {
     });
 
     // Reccobeats offline / system warnings
+    sseSource.addEventListener('vault_updated', e => {
+        try {
+            // Quietly refresh vault stats count so the header badge stays accurate
+            fetch('/api/vault_stats').then(r => r.json()).then(d => {
+                vault = d;
+                const el = document.getElementById('vaultCount');
+                if (el) el.textContent = d.cached || 0;
+            }).catch(() => {});
+        } catch(err) {}
+    });
+
     sseSource.addEventListener('system_warning', e => {
         try {
-            const { message } = JSON.parse(e.data);
+            const { message, type } = JSON.parse(e.data);
             showGhostStatusBanner(message, 'warning');
+            // If auto-sync added new tracks, reload data automatically
+            if (type === 'PLAYLIST_UPDATED') {
+                setTimeout(() => loadData(), 1500);
+            }
         } catch(err) {}
     });
 
@@ -2705,13 +2809,13 @@ const PRESET_DEFAULT = [
 
 function loadPresets() {
     try {
-        const raw = localStorage.getItem('ventus_playlist_presets');
+        const raw = _store.getItem('ventus_playlist_presets');
         return raw ? JSON.parse(raw) : [...PRESET_DEFAULT];
     } catch { return [...PRESET_DEFAULT]; }
 }
 
 function savePresets(presets) {
-    localStorage.setItem('ventus_playlist_presets', JSON.stringify(presets));
+    _store.setItem('ventus_playlist_presets', JSON.stringify(presets));
 }
 
 function rebuildPresetSelect() {
@@ -3269,18 +3373,17 @@ document.addEventListener('DOMContentLoaded', () => {
 // Returns a Promise that resolves with the entered string, or null if cancelled.
 function customPrompt(title = 'INPUT REQUIRED', label = 'Enter value', placeholder = '') {
     return new Promise(resolve => {
-        const overlay = document.getElementById('customPromptOverlay');
-        const tagEl   = document.getElementById('customPromptTag');
-        const lblEl   = document.getElementById('customPromptLabel');
-        const input   = document.getElementById('customPromptInput');
-        const okBtn   = document.getElementById('customPromptOk');
+        const overlay   = document.getElementById('customPromptOverlay');
+        const tagEl     = document.getElementById('customPromptTag');
+        const lblEl     = document.getElementById('customPromptLabel');
+        const input     = document.getElementById('customPromptInput');
+        const okBtn     = document.getElementById('customPromptOk');
         const cancelBtn = document.getElementById('customPromptCancel');
 
-        tagEl.textContent   = `// ${title.toUpperCase()}`;
-        lblEl.textContent   = label;
-        input.placeholder   = placeholder;
-        input.value         = '';
-        overlay.style.display = 'flex';
+        tagEl.textContent = `// ${title.toUpperCase()}`;
+        lblEl.textContent = label;
+        input.placeholder = placeholder;
+        input.value       = '';
 
         const cleanup = () => {
             overlay.style.display = 'none';
@@ -3288,16 +3391,22 @@ function customPrompt(title = 'INPUT REQUIRED', label = 'Enter value', placehold
             cancelBtn.removeEventListener('click', onCancel);
             input.removeEventListener('keydown', onKey);
         };
-        const onOk = () => { const v = input.value.trim(); cleanup(); resolve(v || null); };
+        const onOk     = () => { const v = input.value.trim(); cleanup(); resolve(v || null); };
         const onCancel = () => { cleanup(); resolve(null); };
-        const onKey = e => {
-            if (e.key === 'Enter') onOk();
+        const onKey    = e => {
+            if (e.key === 'Enter')  onOk();
             if (e.key === 'Escape') onCancel();
         };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
         input.addEventListener('keydown', onKey);
-        setTimeout(() => input.focus(), 60);
+
+        // rAF ensures Electron re-triggers layout when switching none→flex
+        overlay.style.display = 'none';
+        requestAnimationFrame(() => {
+            overlay.style.display = 'flex';
+            setTimeout(() => input.focus(), 60);
+        });
     });
 }
 
@@ -3353,6 +3462,58 @@ async function backfillVault() {
     }
 }
 
+function rescanGhosts() {
+    const btn = document.getElementById('rescanBtn');
+    const log = document.getElementById('rescanLog');
+    if (!btn || !log) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>SCANNING…';
+    log.style.display = 'block';
+    log.innerHTML = '<div>◈ INITIATING GHOST SIGNAL RESCAN…</div>';
+
+    fetch('/api/rescan_ghosts', { method: 'POST' })
+        .then(res => {
+            if (!res.ok) throw new Error('Server error ' + res.status);
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+
+            function pump() {
+                return reader.read().then(({ done, value }) => {
+                    if (done) return;
+                    buf += decoder.decode(value, { stream: true });
+                    const lines = buf.split('\n');
+                    buf = lines.pop();
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const d = JSON.parse(line.slice(6));
+                                const div = document.createElement('div');
+                                div.textContent = d.msg;
+                                log.appendChild(div);
+                                log.scrollTop = log.scrollHeight;
+                            } catch {}
+                        }
+                        if (line.startsWith('event: done')) {
+                            loadData().then(() => {
+                                btn.disabled = false;
+                                btn.textContent = '◈ RESCAN GHOSTS';
+                            });
+                        }
+                    }
+                    return pump();
+                });
+            }
+            return pump();
+        })
+        .catch(err => {
+            log.innerHTML += `<div style="color:var(--err)">// RESCAN ERROR: ${err.message}</div>`;
+            btn.disabled = false;
+            btn.textContent = '◈ RESCAN GHOSTS';
+        });
+}
+
 
 // ═══════════════════════════════ AUTO-ADD PRESET PERSISTENCE ═══
 // Save the selected preset + custom ID on any change so they survive restarts.
@@ -3360,15 +3521,15 @@ function saveAutoAddState() {
     const sel = document.getElementById('autoAddPlaylistPreset');
     const customInput = document.getElementById('autoAddPlaylistId');
     if (!sel) return;
-    localStorage.setItem('ventus_autoAdd_preset', sel.value);
-    localStorage.setItem('ventus_autoAdd_customId', customInput ? customInput.value : '');
-    localStorage.setItem('ventus_autoAdd_thresh', document.getElementById('autoAddThresh')?.value || '75');
+    _store.setItem('ventus_autoAdd_preset', sel.value);
+    _store.setItem('ventus_autoAdd_customId', customInput ? customInput.value : '');
+    _store.setItem('ventus_autoAdd_thresh', document.getElementById('autoAddThresh')?.value || '75');
 }
 
 function restoreAutoAddState() {
-    const savedPreset   = localStorage.getItem('ventus_autoAdd_preset');
-    const savedCustomId = localStorage.getItem('ventus_autoAdd_customId') || '';
-    const savedThresh   = localStorage.getItem('ventus_autoAdd_thresh');
+    const savedPreset   = _store.getItem('ventus_autoAdd_preset');
+    const savedCustomId = _store.getItem('ventus_autoAdd_customId') || '';
+    const savedThresh   = _store.getItem('ventus_autoAdd_thresh');
     const sel           = document.getElementById('autoAddPlaylistPreset');
     const customInput   = document.getElementById('autoAddPlaylistId');
     const thresh        = document.getElementById('autoAddThresh');
@@ -3393,11 +3554,15 @@ function restoreAutoAddState() {
 
 // ═══════════════════════════════ FIRST-RUN DETECTION ═══
 // Called inside loadData() after the track count is known.
+let _firstRunShown = false;  // in-memory flag — works in Electron where localStorage may be blocked
 async function checkFirstRun(total) {
-    if (total > 0) return;  // Profile has data — skip
-    if (localStorage.getItem('ventus_onboarded')) return;  // Already shown
-    // Mark so we don't prompt again even if dismissed
-    localStorage.setItem('ventus_onboarded', '1');
+    if (total > 0) return;           // Profile has data — skip
+    if (_firstRunShown) return;      // Already shown this session
+    // Try localStorage, but don't trust it in Electron (may always return null)
+    try {
+        if (_store.getItem('ventus_onboarded') === '1') return;
+    } catch(e) {}
+    _firstRunShown = true;           // Mark AFTER we decide to show, not before
     const pid = await customPrompt(
         '◈ WELCOME TO VENTUS',
         'No Taste Profile found. Paste your favourite Spotify Playlist ID or URL to get started:',
@@ -3407,6 +3572,8 @@ async function checkFirstRun(total) {
         showToast('// First-run setup skipped — sync manually via the sidebar buttons', 'warn');
         return;
     }
+    // Only persist after successful prompt
+    try { _store.setItem('ventus_onboarded', '1'); } catch(e) {}
     const cleanId = pid.trim().split('/').pop().split('?')[0];
     showToast('// FIRST-RUN SYNC INITIATED — learning your taste profile…');
     // Set as the auto-add target too (so user only has to enter it once)

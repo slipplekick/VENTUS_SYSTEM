@@ -136,12 +136,22 @@ function createWindow() {
             preload:          path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration:  false,
+            devTools:         true,
         },
         show: false,
     });
 
     mainWindow.loadURL(FLASK_URL);
     mainWindow.once('ready-to-show', () => mainWindow.show());
+
+    // F12 — toggle DevTools
+    mainWindow.webContents.on('before-input-event', (e, input) => {
+        if (input.key === 'F12' && input.type === 'keyDown') {
+            mainWindow.webContents.isDevToolsOpened()
+                ? mainWindow.webContents.closeDevTools()
+                : mainWindow.webContents.openDevTools({ mode: 'detach' });
+        }
+    });
 
     mainWindow.on('close', e => {
         if (!app.isQuiting) { e.preventDefault(); mainWindow.hide(); }
