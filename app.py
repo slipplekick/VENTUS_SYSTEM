@@ -11,6 +11,16 @@ import threading
 import tempfile
 from datetime import datetime
 
+# ── LIBROSA (Ghost Signal local engine) ───────────────────────────────────────
+try:
+    import librosa
+    import numpy as np
+    LIBROSA_OK = True
+    print("[BOOT] librosa OK — Ghost Signal local engine ACTIVE")
+except ImportError:
+    LIBROSA_OK = False
+    print("[BOOT] librosa NOT installed — Ghost Signal DISABLED (pip install librosa to enable)")
+
 # ── ENCODING FIX ──────────────────────────────────────────────────────────────
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -415,9 +425,9 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
         _gs(f"AUDIO DOWNLOAD FAILED: {e}"); return None
 
     try:
+        if not LIBROSA_OK:
+            _gs("LIBROSA NOT INSTALLED — pip install librosa — CANNOT ANALYZE"); return None
         _gs("AUDIO ACQUIRED — RUNNING LOCAL ACOUSTIC ANALYSIS...")
-        import librosa   # lazy — loaded only on first Ghost Signal hit
-        import numpy as np
 
         y, sr = librosa.load(audio_path, sr=22050, duration=30)
 
@@ -459,8 +469,6 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
             'mode':             mode,
             '_source':          'local_engine',  # stripped by vault_insert
         }
-    except ImportError:
-        _gs("LIBROSA NOT INSTALLED — pip install librosa — CANNOT ANALYZE"); return None
     except Exception as e:
         _gs(f"LOCAL ENGINE FAILED: {e}"); return None
     finally:
@@ -833,6 +841,26 @@ def sync_playlist():
     if new_rows:
         pd.concat([df,pd.DataFrame(new_rows)],ignore_index=True).to_csv(master_path,index=False)
         global TASTE_PROFILE; TASTE_PROFILE=get_taste_profile()
+        # ── Also push all tracks that have metrics into the SQLite vault ──────
+        vault_rows = []
+        for rd in new_rows:
+            # Only insert rows where ReccoBeats actually returned features
+            if rd.get(e_col) or rd.get(b_col):
+                tid = rd.get(id_col,'')
+                if tid:
+                    vault_rows.append({
+                        'id':               tid,
+                        'energy':           float(rd.get(e_col,  0) or 0),
+                        'valence':          float(rd.get(v_col,  0) or 0),
+                        'danceability':     float(rd.get(d_col,  0) or 0),
+                        'bpm':              float(rd.get(b_col,  0) or 0),
+                        'acousticness':     float(rd.get(ac_col, 0) or 0),
+                        'instrumentalness': float(rd.get(in_col, 0) or 0),
+                        'loudness':         float(rd.get(lo_col, 0) or 0),
+                    })
+        if vault_rows:
+            vault_insert(vault_rows)
+            print(f"[SYNC] Pushed {len(vault_rows)}/{len(new_rows)} rows to vault")
         return jsonify({"success":True,"added":len(new_rows),
             "message":f"SYNC COMPLETE — {len(new_rows)} new track(s) added with audio features."})
     return jsonify({"success":True,"added":0,"message":"SIGNAL ALIGNED — no new tracks detected."})
@@ -1011,7 +1039,119 @@ def add_to_playlist():
         return jsonify({"error":f"Spotify returned {ar.status_code}"}),400
     except Exception as e: return jsonify({"error":str(e)}),500
 
-# ── REBUILD DNA ───────────────────────────────────────────────────────────────
+# ── TRACK INFO (single track name/artist lookup for vault display) ────────────
+@app.route('/api/track_info')
+def track_info():
+    tid = request.args.get('id', '').strip()
+    if not tid: return jsonify({"error": "No id"}), 400
+    token = get_spotify_token()
+    if not token: return jsonify({"error": "Auth failed"}), 401
+    try:
+        res = requests.get(f"{get_api()}/tracks/{tid}",
+                           headers={"Authorization": f"Bearer {token}"}, timeout=8)
+        if res.status_code != 200:
+            return jsonify({"error": f"Spotify {res.status_code}"}), 404
+        item   = res.json()
+        images = item.get('album', {}).get('images', [])
+        feat   = vault_get(tid)
+        return jsonify({
+            "id":        tid,
+            "name":      item.get('name', ''),
+            "artist":    item['artists'][0]['name'] if item.get('artists') else 'Unknown',
+            "album_art": images[0]['url'] if images else None,
+            "camelot":   get_camelot(feat['key'], feat['mode']) if feat else '--',
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backfill_vault', methods=['POST'])
+def backfill_vault():
+    """
+    One-shot: reads master_vibe_training_set.csv and inserts every row that
+    has real audio metrics into the SQLite vault (skipping rows with all-zero
+    features, i.e. the null / Ghost-blocked tracks).
+    Safe to run multiple times — INSERT OR REPLACE is idempotent.
+    """
+    master_path = os.path.join(_HERE, 'master_vibe_training_set.csv')
+    try:
+        df = pd.read_csv(master_path).fillna(0)
+    except FileNotFoundError:
+        return jsonify({"error": "No master CSV found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    id_col  = find_col(df, ['spotify track id','track id','id'])
+    e_col   = find_col(df, ['energy'])
+    v_col   = find_col(df, ['valence'])
+    d_col   = find_col(df, ['dance'])
+    b_col   = find_col(df, ['bpm','tempo'])
+    ac_col  = find_col(df, ['acoustic'])
+    in_col  = find_col(df, ['instrument'])
+    lo_col  = find_col(df, ['loud'])
+    k_col   = find_col(df, ['key'])
+    m_col   = find_col(df, ['mode'])
+
+    if not id_col:
+        return jsonify({"error": "Cannot find ID column in CSV"}), 500
+
+    existing = set()
+    try:
+        with _db() as c:
+            rows_db = c.execute("SELECT id FROM vault").fetchall()
+            existing = {r['id'] for r in rows_db}
+    except: pass
+
+    vault_rows = []
+    skipped_null = 0
+    already_in   = 0
+
+    for _, r in df.iterrows():
+        tid = str(r.get(id_col, '')).strip()
+        if not tid or tid == 'nan': continue
+        if tid in existing:
+            already_in += 1; continue
+
+        e  = float(r.get(e_col,  0) or 0) if e_col  else 0
+        b  = float(r.get(b_col,  0) or 0) if b_col  else 0
+
+        # Skip rows where ReccoBeats never returned anything (all zeros = null track)
+        if e == 0 and b == 0:
+            skipped_null += 1; continue
+
+        def fv(col, fb=0.0):
+            if not col: return fb
+            try: return float(r.get(col, fb) or fb)
+            except: return fb
+
+        vault_rows.append({
+            'id':               tid,
+            'energy':           e,
+            'valence':          fv(v_col),
+            'danceability':     fv(d_col),
+            'bpm':              b,
+            'acousticness':     fv(ac_col),
+            'instrumentalness': fv(in_col),
+            'loudness':         fv(lo_col),
+            'key':              int(r.get(k_col, -1) or -1) if k_col else -1,
+            'mode':             int(r.get(m_col,  1) or  1) if m_col else  1,
+        })
+
+    if vault_rows:
+        vault_insert(vault_rows)
+
+    return jsonify({
+        "success":      True,
+        "inserted":     len(vault_rows),
+        "already_had":  already_in,
+        "skipped_null": skipped_null,
+        "vault_total":  vault_count(),
+        "message": (f"BACKFILL COMPLETE — {len(vault_rows)} tracks pushed to vault. "
+                    f"{skipped_null} null-metric tracks skipped. "
+                    f"{already_in} already cached.")
+    })
+
+
 @app.route('/api/rebuild_dna', methods=['POST'])
 def rebuild_dna():
     master_path=os.path.join(_HERE,'master_vibe_training_set.csv')

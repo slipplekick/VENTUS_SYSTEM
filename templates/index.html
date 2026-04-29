@@ -1185,7 +1185,10 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
                 <option value="energy_desc">ENERGY: HIGH → LOW</option>
                 <option value="valence_desc">VALENCE: HIGH → LOW</option>
                 <option value="bpm_desc">BPM: HIGH → LOW</option>
+                <option value="acoustic_desc">ACOUSTIC: HIGH → LOW</option>
+                <option value="loudness_desc">LOUDNESS: HIGH → LOW</option>
             </select>
+            <button class="sys-btn" id="backfillBtn" onclick="backfillVault()" style="white-space:nowrap">⬆ BACKFILL VAULT</button>
         </div>
         <div class="list-header" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
             <div>#</div><div>TRACK</div><div>KEY</div>
@@ -1408,6 +1411,8 @@ let vibeProfile          = {};
 let tracks               = [];
 let vaultData            = [];
 let historyLog           = [];
+let vaultNameCache       = {};   // id → {song, artist, key} for vault-only tracks
+let vaultNamePending     = new Set(); // IDs currently being fetched — prevent duplicate calls
 let autoAnalyzeEnabled   = false;
 let lastAnalyzedFeatures = null;
 let pollTimer            = null;
@@ -1481,6 +1486,13 @@ function scoreToVerdict(score) {
 
 // Tiering: physics-based on actual score vs centroid
 // APEX [90-100] CORE [75-89] ALIGNED [58-74] FRINGE [40-57] OUTLIER [<40]
+function get_camelot_js(key, mode) {
+    if (key < 0 || key > 11 || (mode !== 0 && mode !== 1)) return '--';
+    const maj = ["8B","3B","10B","5B","12B","7B","2B","9B","4B","11B","6B","1B"];
+    const min = ["5A","12A","7A","2A","9A","4A","11A","6A","1A","8A","3A","10A"];
+    return mode === 1 ? maj[key] : min[key];
+}
+
 function getTier(score) {
     if (score >= 90) return { tier: 'APEX',    color: 'var(--resonance)' };
     if (score >= 75) return { tier: 'CORE',    color: 'var(--neon)'      };
@@ -1507,6 +1519,8 @@ document.querySelectorAll('.nav-item').forEach(el => {
     el.addEventListener('click', () => showPage(el.dataset.page));
 });
 
+let _queuePollInterval = null;
+
 function showPage(p) {
     document.querySelectorAll('.page').forEach(pg => pg.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(ni => ni.classList.remove('active'));
@@ -1516,8 +1530,22 @@ function showPage(p) {
     if (ni) ni.classList.add('active');
     if (p === 'vault')   renderVault();
     if (p === 'history') renderHistory();
-    if (p === 'queue')   loadQueue();
     if (p === 'signals') loadSignals();
+
+    // Queue: load immediately and start 30s auto-refresh while tab is active
+    if (p === 'queue') {
+        loadQueue();
+        clearInterval(_queuePollInterval);
+        _queuePollInterval = setInterval(() => {
+            if (document.getElementById('page-queue')?.classList.contains('active')) {
+                loadQueue();
+            } else {
+                clearInterval(_queuePollInterval);
+            }
+        }, 30000);
+    } else {
+        clearInterval(_queuePollInterval);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════ RADAR (7-AXIS) ═══
@@ -1726,7 +1754,9 @@ async function loadData() {
         } catch(e) { console.error('dnaGrid render', e); }
 
         try {
-            document.getElementById('trackList').innerHTML = tracks.map(t => {
+            const validTracks = tracks.filter(t => t.energy > 0 || t.bpm > 0);
+            const nullCount   = tracks.length - validTracks.length;
+            document.getElementById('trackList').innerHTML = validTracks.map(t => {
                 const score = calcScore(t.energy, t.valence, t.dance, t.acousticness, t.instrumentalness, t.loudness, t.bpm);
                 const vc   = verdictClass(scoreToVerdict(score));
                 const tier = getTier(score);
@@ -1745,11 +1775,32 @@ async function loadData() {
                     <div class="col-stat" style="color:var(--dim)">${t.acousticness || '--'}%</div>
                     <div class="col-score ${vc}">${score}%</div>
                 </div>`;
-            }).join('') || '<div class="empty-state">No tracks loaded. Check Flask server.</div>';
+            }).join('')
+            + (nullCount > 0 ? `<div class="empty-state" style="color:var(--dim);font-size:10px;padding:8px 16px">${nullCount} track${nullCount>1?'s':''} hidden — no audio features (Spotify preview unavailable)</div>` : '')
+            || '<div class="empty-state">No tracks loaded. Check Flask server.</div>';
         } catch(e) { console.error('trackList render', e); }
 
         document.getElementById('vaultLabel').textContent = `VAULT: ${cached} / ${total}`;
         document.getElementById('vaultBar').style.width = total ? `${Math.min(100,(cached/total)*100)}%` : '0%';
+
+        // Pre-resolve names for vault-only entries BEFORE rendering — no ID flash ever
+        try {
+            const csvIds     = new Set(tracks.map(t => t.id).filter(Boolean));
+            const unknownIds = vaultData.map(v => v.id).filter(id => id && !csvIds.has(id) && !vaultNameCache[id]);
+            if (unknownIds.length > 0) {
+                await Promise.allSettled(unknownIds.map(async id => {
+                    vaultNamePending.add(id);
+                    try {
+                        const r = await fetch('/api/track_info?id=' + encodeURIComponent(id));
+                        if (r.ok) {
+                            const d = await r.json();
+                            if (d.name) vaultNameCache[id] = { song: d.name, artist: d.artist, key: d.camelot || '--' };
+                        }
+                    } catch(e) {}
+                    vaultNamePending.delete(id);
+                }));
+            }
+        } catch(e) { console.warn('vault name prefetch', e); }
 
         try { renderVault(); } catch(e) { console.error('renderVault', e); }
 
@@ -1768,23 +1819,66 @@ function escHtml(s) {
 
 // ═══════════════════════════════════════════════════════════ VAULT ═══
 
+// Lazily resolve track name/artist for vault-only entries (not in taste profile CSV).
+// Calls /api/track_info which does a single Spotify /tracks/{id} lookup.
+// On success, stores in vaultNameCache and re-renders the vault.
+async function fetchVaultName(id) {
+    vaultNamePending.add(id);
+    try {
+        const res = await fetch(`/api/track_info?id=${encodeURIComponent(id)}`);
+        if (res.ok) {
+            const d = await res.json();
+            if (d.name) {
+                vaultNameCache[id] = { song: d.name, artist: d.artist, key: d.camelot || '--' };
+                renderVault();   // re-render now we have the name
+            }
+        }
+    } catch(e) {}
+    vaultNamePending.delete(id);
+}
+
 function renderVault() {
     const q    = (document.getElementById('vaultSearch')?.value || '').toLowerCase();
     const sort = document.getElementById('vaultSort')?.value || 'num';
 
-    let filtered = tracks.filter(t => {
+    // Build a merged view: start with vaultData (SQLite, the source of truth for metrics),
+    // then overlay song/artist names from the tracks CSV where available.
+    // Vault-only entries (from queue/scorer sessions) look up names via Spotify lazily.
+    const nameMap = {};
+    tracks.forEach(t => { if (t.id) nameMap[t.id] = t; });
+
+    let filtered = vaultData.map((v, i) => {
+        const meta      = nameMap[v.id] || vaultNameCache[v.id] || {};
+        const unknown   = !meta.song;
+        if (unknown && !vaultNamePending.has(v.id)) fetchVaultName(v.id);
+        return {
+            num:              i + 1,
+            id:               v.id,
+            song:             meta.song   || v.id.slice(0, 10) + '…',
+            artist:           meta.artist || (unknown ? 'VAULT ONLY' : '—'),
+            key:              meta.key     || get_camelot_js(v.key, v.mode),
+            energy:           Math.round(v.energy),
+            valence:          Math.round(v.valence),
+            dance:            Math.round(v.danceability),
+            bpm:              Math.round(v.bpm),
+            acousticness:     Math.round(v.acousticness),
+            instrumentalness: Math.round(v.instrumentalness),
+            loudness:         v.loudness,
+        };
+    }).filter(t => {
         if (!q) return true;
-        return t.song.toLowerCase().includes(q) ||
-               t.artist.toLowerCase().includes(q);
+        return t.song.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q);
     });
 
     filtered = filtered.map(t => ({ ...t, _score: calcScore(t.energy, t.valence, t.dance, t.acousticness, t.instrumentalness, t.loudness, t.bpm) }));
 
-    if (sort === 'score_desc')   filtered.sort((a,b) => b._score - a._score);
+    if (sort === 'score_desc')        filtered.sort((a,b) => b._score - a._score);
     else if (sort === 'score_asc')    filtered.sort((a,b) => a._score - b._score);
     else if (sort === 'energy_desc')  filtered.sort((a,b) => b.energy - a.energy);
     else if (sort === 'valence_desc') filtered.sort((a,b) => b.valence - a.valence);
     else if (sort === 'bpm_desc')     filtered.sort((a,b) => b.bpm - a.bpm);
+    else if (sort === 'acoustic_desc')  filtered.sort((a,b) => b.acousticness - a.acousticness);
+    else if (sort === 'loudness_desc')  filtered.sort((a,b) => b.loudness - a.loudness);
 
     const html = filtered.map(t => {
         const tier = getTier(t._score);
@@ -2283,6 +2377,11 @@ function handleNowPlaying(data) {
             renderHistory();
 
             if (autoAnalyzeEnabled) setTimeout(() => triggerScore(false), 2000);
+
+            // Auto-refresh queue when track changes (new song = new queue order)
+            if (document.getElementById('page-queue')?.classList.contains('active')) {
+                setTimeout(loadQueue, 1500); // slight delay so Spotify updates its queue
+            }
         }
 
         // Start local progress ticker so bar moves smoothly between SSE events
@@ -2917,7 +3016,9 @@ async function loadQueue() {
         }
 
         if (badge) { badge.textContent = data.length; badge.style.display = 'block'; }
-        if (statusEl) statusEl.textContent = `// ${data.length} TRACKS SCORED`;
+        const now = new Date();
+        const ts  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+        if (statusEl) statusEl.textContent = `// ${data.length} TRACKS SCORED · LAST SYNC ${ts}`;
 
         listEl.innerHTML = data.map((t, i) => {
             const vc     = t.score !== null ? verdictClass(t.verdict) : 'unrated';
@@ -3177,6 +3278,28 @@ async function wipeProfile() {
         btn.textContent = '✕ WIPE TASTE PROFILE';
     }
 }
+
+async function backfillVault() {
+    const btn = document.getElementById('backfillBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>BACKFILLING…';
+    try {
+        const res  = await fetch('/api/backfill_vault', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`// ${data.message}`);
+            await loadData();   // refresh vaultData + counter
+        } else {
+            showToast(`// BACKFILL ERROR: ${data.error || 'unknown'}`, 'error');
+        }
+    } catch(e) {
+        showToast('// BACKFILL FAILED — server unreachable', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⬆ BACKFILL VAULT';
+    }
+}
+
 
 // ═══════════════════════════════ AUTO-ADD PRESET PERSISTENCE ═══
 // Save the selected preset + custom ID on any change so they survive restarts.
