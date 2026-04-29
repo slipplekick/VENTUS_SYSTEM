@@ -1,0 +1,3091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self'; media-src 'self' https:;">
+<title>VENTUS // SYS</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════ DESIGN TOKENS ═══ */
+:root {
+    --void:      #010306;
+    --deep:      #04080f;
+    --surface:   #070d18;
+    --panel:     #0a1220;
+    --panel2:    #0d1728;
+    --panel3:    #101e32;
+    --border:    rgba(100,200,255,0.10);
+    --border2:   rgba(100,200,255,0.18);
+
+    /* Sternritter / Yhwach — cold sovereign white/blue */
+    --ice:       #a8d4ff;
+    --sovereign: #ddeeff;
+    --quincy:    #4db8ff;
+    --quincy2:   #1a8cdc;
+
+    /* Ichigo True Bankai — black + hot orange-red slash */
+    --bankai:    #ff4c2b;
+    --bankai2:   #ff7a1a;
+
+    /* Cyberpunk 2077 — electric yellow, neon cyan */
+    --chrome:    #f5e642;
+    --neon:      #00e5cc;
+
+    --text:      #cde4f8;
+    --dim:       rgba(168,212,255,0.60);
+    --dim2:      rgba(168,212,255,0.22);
+
+    /* Verdict palette */
+    --resonance: #d4af37;   /* gold — transcendent */
+    --locked:    #00e5cc;   /* neon cyan — perfect lock */
+    --adjacent:  #4db8ff;   /* quincy blue — good fit */
+    --peripheral:#f5e642;   /* chrome yellow — borderline */
+    --clash:     #ff7a1a;   /* bankai orange — conflict */
+    --void-sig:  #ff4c2b;   /* bankai red — total void */
+
+    --sidebar:   296px;
+    --radius:    3px;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size: 17px; scroll-behavior: smooth; }
+
+/* ── CUSTOM SCROLLBAR ── */
+::-webkit-scrollbar              { width: 4px; height: 4px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: rgba(77,184,255,0.2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover  { background: rgba(77,184,255,0.45); }
+::-webkit-scrollbar-corner       { background: transparent; }
+
+/* ── CUSTOM TITLEBAR ── */
+.titlebar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 32px;
+    background: var(--deep);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    -webkit-app-region: drag;
+    z-index: 9000;
+    padding-right: 4px;
+}
+.titlebar-btn {
+    -webkit-app-region: no-drag;
+    width: 28px; height: 28px;
+    border: none; background: transparent;
+    color: var(--dim); font-size: 13px;
+    cursor: pointer; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Share Tech Mono';
+    transition: background 0.15s, color 0.15s;
+}
+.titlebar-btn:hover       { background: rgba(77,184,255,0.1); color: var(--text); }
+.titlebar-btn.close:hover { background: rgba(255,80,80,0.2);  color: #ff5050; }
+.titlebar-title {
+    flex: 1;
+    font-family: 'Share Tech Mono'; font-size: 10px;
+    color: var(--dim); letter-spacing: 3px;
+    padding-left: 14px; pointer-events: none;
+    user-select: none;
+}
+.sidebar { top: 32px !important; height: calc(100% - 32px) !important; }
+.main    { padding-top: calc(32px + 28px) !important; }
+
+body {
+    background: var(--void);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+/* 1440p layout scaling */
+@media (min-width: 1440px) {
+    :root { --sidebar: 320px; }
+    .main { padding: 48px 72px; max-width: 1600px; }
+    .kpi-grid { grid-template-columns: repeat(4,1fr); gap: 18px; }
+    .charts-row { gap: 22px; }
+    .kpi-val { font-size: 48px; }
+    .profile-stat-val { font-size: 38px; }
+}
+
+/* ── SCANLINE OVERLAY ── */
+body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+    );
+}
+
+/* ── TOAST ── */
+#toast {
+    position: fixed; top: 22px; right: -480px; max-width: 400px;
+    background: rgba(4,8,15,0.97); border-left: 3px solid var(--neon);
+    padding: 14px 20px; font-family: 'Share Tech Mono'; font-size: 12px;
+    color: var(--text); z-index: 9999;
+    transition: right 0.45s cubic-bezier(0.175,0.885,0.32,1.275);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.8), inset 0 0 30px rgba(77,184,255,0.03);
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+#toast.show { right: 20px; }
+#toast.error { border-left-color: var(--bankai); }
+#toast.warn  { border-left-color: var(--chrome); }
+
+/* ── SIDEBAR ── */
+.sidebar {
+    position: fixed; left: 0; top: 0;
+    width: var(--sidebar); height: 100%;
+    background: var(--deep);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; z-index: 200;
+    box-shadow: 4px 0 30px rgba(0,0,0,0.6);
+}
+
+/* Top accent line */
+.sidebar::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--quincy2), var(--quincy), transparent);
+}
+
+/* ── LOGO ── */
+.logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+.logo-mark {
+    font-family: 'Bebas Neue'; font-size: 28px;
+    letter-spacing: 4px; line-height: 1;
+    background: linear-gradient(135deg, var(--sovereign) 0%, var(--quincy) 60%, var(--neon) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.logo-mark span {
+    background: linear-gradient(135deg, var(--bankai) 0%, var(--bankai2) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.logo-sub {
+    font-family: 'Share Tech Mono'; font-size: 10px;
+    color: var(--dim); margin-top: 5px; letter-spacing: 2px;
+    display: flex; align-items: center; gap: 8px;
+}
+.logo-sub::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    background: var(--neon); border-radius: 50%;
+    box-shadow: 0 0 8px var(--neon);
+    animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+    0%,100%{ opacity:1; box-shadow: 0 0 8px var(--neon); }
+    50%     { opacity:0.3; box-shadow: none; }
+}
+
+/* ── NAV ── */
+.nav { padding: 8px 0; overflow-y: auto; flex: 1; min-height: 0; }
+.nav-item {
+    padding: 9px 20px; cursor: pointer; color: var(--dim);
+    font-family: 'Barlow Condensed'; font-weight: 700;
+    font-size: 15px; letter-spacing: 2px;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 10px;
+    user-select: none; text-transform: uppercase;
+    position: relative;
+}
+.nav-item::after {
+    content: ''; position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+    width: 0; height: 1px; background: var(--quincy);
+    transition: width 0.2s;
+}
+.nav-item:hover { color: var(--text); background: rgba(77,184,255,0.04); }
+.nav-item:hover::after { width: 20px; }
+.nav-item.active {
+    color: var(--quincy); border-left-color: var(--quincy);
+    background: rgba(77,184,255,0.06);
+}
+.nav-item.active::after { width: 20px; }
+.nav-icon { font-size: 11px; width: 14px; text-align: center; flex-shrink: 0; opacity: 0.8; }
+.nav-badge {
+    margin-left: auto; font-family: 'Share Tech Mono'; font-size: 9px;
+    background: rgba(0,229,204,0.12); color: var(--neon);
+    padding: 2px 6px; border-radius: 2px; border: 1px solid rgba(0,229,204,0.25);
+}
+
+.sync-btn {
+    margin: 6px 14px 8px; padding: 10px 14px;
+    background: rgba(77,184,255,0.06); border: 1px solid rgba(77,184,255,0.3);
+    color: var(--quincy); font-family: 'Share Tech Mono'; font-size: 10px;
+    cursor: pointer; text-align: center; border-radius: var(--radius);
+    transition: all 0.2s; letter-spacing: 1.5px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.sync-btn:hover:not(:disabled) {
+    background: rgba(77,184,255,0.14); border-color: var(--quincy);
+    box-shadow: 0 0 20px rgba(77,184,255,0.15);
+}
+.sync-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── LIVE FEED (sidebar bottom) ── */
+.live-feed {
+    border-top: 1px solid var(--border);
+    padding: 14px 16px;
+    background: linear-gradient(to top, rgba(77,184,255,0.03), transparent);
+    display: none;
+}
+.live-tag {
+    font-family: 'Share Tech Mono'; font-size: 10px;
+    color: var(--quincy); letter-spacing: 2px;
+    margin-bottom: 10px; display: flex; align-items: center; gap: 7px;
+    text-transform: uppercase;
+}
+.live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--neon); flex-shrink: 0;
+    box-shadow: 0 0 6px var(--neon);
+    animation: blink 1.4s infinite;
+}
+@keyframes blink {
+    0%,100% { opacity:1; }
+    50%      { opacity:0.15; }
+}
+.np-art-wrap {
+    width: 100%; aspect-ratio: 1;
+    border-radius: 4px; margin-bottom: 10px;
+    overflow: hidden; display: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.7);
+    border: 1px solid var(--border);
+    position: relative;
+}
+.np-art { width: 100%; height: 100%; object-fit: cover; display: block; }
+.np-art-score {
+    position: absolute; bottom: 8px; right: 8px;
+    font-family: 'Bebas Neue'; font-size: 22px;
+    background: rgba(4,8,15,0.88);
+    padding: 1px 10px; border-radius: 2px;
+    display: none;
+}
+.np-song {
+    font-family: 'Barlow Condensed'; font-weight: 700;
+    font-size: 16px; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--sovereign);
+}
+.np-artist { font-size: 13px; color: var(--dim); margin-top: 3px; font-family: 'Share Tech Mono'; font-size: 14px; }
+.progress-bar {
+    height: 2px; background: var(--dim2);
+    border-radius: 1px; margin: 10px 0 4px; overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--quincy2), var(--quincy));
+    border-radius: 1px; width: 0%;
+    transition: width 1s linear;
+}
+.progress-time {
+    display: flex; justify-content: space-between;
+    font-family: 'Share Tech Mono'; font-size: 11px;
+}
+.toggle-wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: 'Share Tech Mono'; font-size: 12px; color: var(--dim);
+    margin-bottom: 9px; letter-spacing: 1px;
+}
+.switch { position: relative; display: inline-block; width: 34px; height: 16px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute; cursor: pointer;
+    inset: 0; background: var(--dim2); transition: .3s; border-radius: 16px;
+}
+.slider::before {
+    position: absolute; content: "";
+    height: 10px; width: 10px; left: 3px; bottom: 3px;
+    background: var(--text); transition: .3s; border-radius: 50%;
+}
+input:checked + .slider { background: var(--quincy); }
+input:checked + .slider::before { transform: translateX(18px); background: var(--void); }
+
+.np-btn {
+    width: 100%; padding: 10px;
+    background: none; border: 1px solid var(--quincy);
+    color: var(--quincy); cursor: pointer;
+    font-family: 'Share Tech Mono'; font-size: 11px;
+    letter-spacing: 1.5px; transition: all 0.15s; border-radius: var(--radius);
+    text-transform: uppercase;
+    clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+.np-btn:hover:not(:disabled) {
+    background: var(--quincy); color: var(--void);
+    box-shadow: 0 0 20px rgba(77,184,255,0.3);
+}
+.np-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: var(--dim); color: var(--dim); }
+
+.vault-status {
+    padding: 8px 16px 12px;
+    font-family: 'Share Tech Mono'; font-size: 11px; color: var(--dim);
+    letter-spacing: 1px;
+}
+.vault-bar-wrap { height: 1px; background: var(--dim2); border-radius: 1px; margin-top: 5px; }
+.vault-bar { height: 100%; background: rgba(77,184,255,0.4); border-radius: 1px; transition: width 0.6s; }
+
+/* ── MAIN ── */
+.main {
+    margin-left: var(--sidebar);
+    padding: 40px 50px;
+    min-height: 100vh;
+    position: relative; z-index: 1;
+}
+.page { display: none; animation: fadeIn 0.22s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+.page-title {
+    font-family: 'Bebas Neue'; font-size: 32px;
+    letter-spacing: 4px; margin-bottom: 28px;
+    color: var(--sovereign); text-transform: uppercase;
+    display: flex; align-items: center; gap: 12px;
+}
+.page-title::before {
+    content: ''; display: inline-block; width: 3px; height: 28px;
+    background: linear-gradient(to bottom, var(--quincy), var(--neon));
+    flex-shrink: 0;
+}
+.page-title span { color: var(--quincy); }
+
+/* ── SHARED INPUT ── */
+.sys-input {
+    width: 100%; padding: 12px 16px;
+    background: var(--panel); border: 1px solid var(--border2);
+    color: var(--text); font-family: 'Share Tech Mono'; font-size: 14px;
+    border-radius: var(--radius); outline: none; transition: border 0.2s, box-shadow 0.2s;
+    margin-bottom: 16px;
+}
+.sys-input:focus {
+    border-color: var(--quincy);
+    box-shadow: 0 0 0 1px rgba(77,184,255,0.15), inset 0 0 20px rgba(77,184,255,0.03);
+}
+.sys-input::placeholder { color: var(--dim); }
+
+/* ── DASHBOARD ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+.kpi {
+    background: var(--panel); padding: 20px 22px;
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--quincy2);
+    border-radius: var(--radius); position: relative; overflow: hidden;
+}
+.kpi::after {
+    content: ''; position: absolute; top:-20px; right:-20px;
+    width: 60px; height: 60px;
+    background: radial-gradient(circle, rgba(77,184,255,0.07), transparent 70%);
+}
+.kpi-label {
+    font-family: 'Share Tech Mono'; font-size: 10px;
+    color: var(--dim); letter-spacing: 1.5px; margin-bottom: 7px;
+    text-transform: uppercase;
+}
+.kpi-val { font-family: 'Bebas Neue'; font-size: 42px; color: var(--quincy); line-height: 1; }
+.kpi-val.cyan   { color: var(--neon); }
+.kpi-val.gold   { color: var(--resonance); }
+.kpi-val.chrome { color: var(--chrome); }
+.kpi-val.red    { color: var(--bankai); }
+
+.charts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+.chart-panel {
+    background: var(--panel); padding: 22px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+}
+.chart-title {
+    font-family: 'Share Tech Mono'; font-size: 10px; color: var(--dim);
+    letter-spacing: 1.5px; margin-bottom: 16px; text-transform: uppercase;
+}
+.histogram { display: flex; align-items: flex-end; gap: 4px; height: 100px; }
+.hist-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.hist-bar {
+    width: 100%; background: rgba(77,184,255,0.25);
+    border-radius: 2px 2px 0 0; min-height: 3px; transition: height 0.5s;
+    cursor: default;
+}
+.hist-bar:hover { background: var(--quincy); }
+.hist-lbl { font-family: 'Share Tech Mono'; font-size: 8px; color: var(--dim); }
+
+.dash-radar-wrap { display: flex; justify-content: center; align-items: center; height: 140px; }
+
+.profile-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+@media (min-width: 1200px) { .profile-row { grid-template-columns: repeat(7,1fr); } }
+.profile-stat {
+    background: var(--panel); padding: 18px;
+    border: 1px solid var(--border); text-align: center; border-radius: var(--radius);
+}
+.profile-stat-label {
+    font-family: 'Share Tech Mono'; font-size: 11px;
+    color: var(--dim); margin-bottom: 7px; letter-spacing: 1px; text-transform: uppercase;
+}
+.profile-stat-val { font-family: 'Bebas Neue'; font-size: 34px; color: var(--quincy); }
+.profile-bar { height: 2px; background: var(--dim2); border-radius: 1px; margin-top: 8px; }
+.profile-fill { height: 100%; background: var(--quincy); border-radius: 1px; }
+
+.dna-section { margin-top: 26px; }
+.dna-grid { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.dna-tag {
+    font-family: 'Share Tech Mono'; font-size: 11px;
+    background: rgba(77,184,255,0.06); color: var(--quincy);
+    border: 1px solid rgba(77,184,255,0.18);
+    padding: 4px 12px; border-radius: 2px;
+    transition: all 0.2s; cursor: default; letter-spacing: 0.5px;
+}
+.dna-tag:hover { background: rgba(77,184,255,0.14); border-color: var(--quincy); }
+
+/* ── LIST TABLES ── */
+.list-header {
+    display: grid; padding: 9px 14px;
+    font-family: 'Share Tech Mono'; font-size: 12px;
+    color: var(--dim); letter-spacing: 1.5px;
+    border-bottom: 1px solid var(--border2); margin-bottom: 3px;
+    text-transform: uppercase;
+}
+.list-item {
+    display: grid; padding: 12px 14px; background: var(--panel);
+    margin-bottom: 2px; border-radius: var(--radius);
+    font-size: 15px; border-left: 2px solid transparent;
+    transition: all 0.12s; cursor: default;
+}
+.list-item:hover { background: var(--panel2); border-left-color: var(--quincy); transform: translateX(2px); }
+.list-item.clickable { cursor: pointer; }
+
+.col-num  { color: var(--dim); font-family: 'Share Tech Mono'; font-size: 12px; display: flex; align-items: center; }
+.col-info { display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+.col-name { font-family: 'Barlow Condensed'; font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--sovereign); }
+.col-sub  { font-size: 13px; color: var(--dim); margin-top: 2px; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; font-family: 'Share Tech Mono'; }
+.phase-tag {
+    background: rgba(77,184,255,0.08); color: var(--quincy);
+    padding: 1px 5px; border-radius: 1px; font-size: 9px;
+    font-family: 'Share Tech Mono'; letter-spacing: 1px; text-transform: uppercase;
+}
+.col-key  { font-family: 'Share Tech Mono'; font-size: 13px; color: var(--quincy); display: flex; align-items: center; }
+.col-stat { font-family: 'Share Tech Mono'; font-size: 13px; display: flex; align-items: center; }
+.col-score { font-family: 'Bebas Neue'; font-size: 20px; display: flex; align-items: center; }
+
+/* Verdict color classes */
+.resonance  { color: var(--resonance); }
+.locked     { color: var(--neon); }
+.adjacent   { color: var(--quincy); }
+.peripheral { color: var(--chrome); }
+.clash      { color: var(--clash); }
+.void-sig   { color: var(--bankai); }
+.unrated    { color: var(--dim); font-family: 'Share Tech Mono'; font-size: 11px; }
+.standby    { color: var(--dim); font-family: 'Share Tech Mono'; font-size: 11px; }
+
+/* ── SCORER ── */
+.scorer-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
+
+.score-box {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 44px 40px; text-align: center; border-radius: var(--radius);
+    position: relative; overflow: hidden;
+}
+.score-box::before {
+    content: ''; position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+    width: 260px; height: 260px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(77,184,255,0.04), transparent 70%);
+    pointer-events: none;
+}
+.score-idle {
+    color: var(--dim); font-family: 'Share Tech Mono'; font-size: 14px;
+    line-height: 2.5; letter-spacing: 1px;
+}
+.radar-wrap { width: 200px; height: 200px; margin: 0 auto 20px; }
+
+.score-num {
+    font-family: 'Bebas Neue'; font-size: 120px; line-height: 1;
+    color: var(--quincy); transition: color 0.4s;
+    letter-spacing: 2px;
+}
+.score-num.resonance { color: var(--resonance); text-shadow: 0 0 60px rgba(212,175,55,0.35); }
+.score-num.locked    { color: var(--neon);      text-shadow: 0 0 60px rgba(0,229,204,0.35); }
+.score-num.adjacent  { color: var(--quincy);    text-shadow: 0 0 60px rgba(77,184,255,0.3); }
+.score-num.peripheral{ color: var(--chrome);    text-shadow: 0 0 60px rgba(245,230,66,0.3); }
+.score-num.clash     { color: var(--clash);     text-shadow: 0 0 60px rgba(255,122,26,0.3); }
+.score-num.void-sig  { color: var(--bankai);    text-shadow: 0 0 60px rgba(255,76,43,0.3); }
+
+.verdict {
+    font-family: 'Barlow Condensed'; font-size: 20px; font-weight: 900;
+    letter-spacing: 5px; margin-top: 6px; text-transform: uppercase;
+}
+.verdict.resonance  { color: var(--resonance); }
+.verdict.locked     { color: var(--neon); }
+.verdict.adjacent   { color: var(--quincy); }
+.verdict.peripheral { color: var(--chrome); }
+.verdict.clash      { color: var(--clash); }
+.verdict.void-sig   { color: var(--bankai); }
+.verdict.unrated    { color: var(--dim); }
+
+.method-label {
+    font-family: 'Share Tech Mono'; font-size: 12px; color: var(--dim);
+    margin-top: 7px; letter-spacing: 1px;
+}
+
+/* 7-metric features grid */
+.features-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 28px; }
+.features-row-2 { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 10px; }
+.feat-box {
+    background: rgba(77,184,255,0.03); border: 1px solid var(--border);
+    padding: 12px 10px; border-radius: var(--radius);
+}
+.feat-label { font-family: 'Share Tech Mono'; font-size: 11px; color: var(--dim); letter-spacing: 1.5px; margin-bottom: 6px; text-transform: uppercase; }
+.feat-val   { font-family: 'Bebas Neue'; font-size: 26px; color: var(--text); line-height: 1; }
+.feat-delta { font-family: 'Share Tech Mono'; font-size: 12px; color: var(--dim); margin-top: 3px; }
+.feat-delta.good { color: var(--neon); }
+.feat-delta.med  { color: var(--chrome); }
+.feat-delta.bad  { color: var(--bankai); }
+
+.score-sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+.scorer-art-wrap {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 14px; border-radius: var(--radius); text-align: center; display: none;
+}
+.scorer-art {
+    width: 100%; aspect-ratio: 1; object-fit: cover;
+    border-radius: 2px; margin-bottom: 12px; display: block;
+}
+.scorer-track-name  { font-family: 'Barlow Condensed'; font-weight: 700; font-size: 19px; margin-bottom: 3px; color: var(--sovereign); }
+.scorer-track-artist{ font-size: 13px; color: var(--dim); font-family: 'Share Tech Mono'; }
+
+/* Compare bars — full 7 metrics */
+.profile-compare {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 20px; border-radius: var(--radius); display: none;
+}
+.compare-title { font-family: 'Share Tech Mono'; font-size: 12px; color: var(--dim); letter-spacing: 1.5px; margin-bottom: 16px; text-transform: uppercase; }
+.compare-row { margin-bottom: 13px; }
+.compare-labels {
+    display: flex; justify-content: space-between;
+    font-family: 'Share Tech Mono'; font-size: 12px; color: var(--dim); margin-bottom: 5px;
+    text-transform: uppercase;
+}
+.compare-track-val { color: var(--text); }
+.compare-bars { position: relative; height: 5px; background: var(--dim2); border-radius: 2px; }
+.compare-profile-bar {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: rgba(77,184,255,0.15); border-radius: 2px;
+    border-right: 2px solid rgba(77,184,255,0.4);
+}
+.compare-track-bar {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: var(--quincy); border-radius: 2px;
+    transition: width 0.5s; opacity: 0.85;
+}
+.compare-track-bar.green { background: var(--neon); box-shadow: 0 0 6px rgba(0,229,204,0.4); }
+.compare-track-bar.amber { background: var(--chrome); }
+.compare-track-bar.red   { background: var(--bankai); box-shadow: 0 0 6px rgba(255,76,43,0.35); }
+
+/* ── DISCOVER ── */
+.discover-search-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.discover-search-row .sys-input { margin-bottom: 0; flex: 1; }
+.search-btn {
+    padding: 12px 20px; background: none;
+    border: 1px solid var(--quincy); color: var(--quincy);
+    font-family: 'Share Tech Mono'; font-size: 11px;
+    cursor: pointer; border-radius: var(--radius); transition: all 0.15s;
+    white-space: nowrap; letter-spacing: 1px; text-transform: uppercase;
+    clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+.search-btn:hover:not(:disabled) {
+    background: var(--quincy); color: var(--void);
+    box-shadow: 0 0 20px rgba(77,184,255,0.25);
+}
+.search-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.discover-section-title {
+    font-family: 'Share Tech Mono'; font-size: 10px; color: var(--dim);
+    letter-spacing: 1.5px; margin: 20px 0 12px; text-transform: uppercase;
+}
+.neighbor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 12px; }
+.neighbor-card {
+    background: var(--panel); padding: 16px;
+    border-left: 2px solid var(--quincy); border-radius: var(--radius);
+    transition: transform 0.16s, box-shadow 0.16s; cursor: default;
+    display: flex; flex-direction: column; gap: 3px;
+    border: 1px solid var(--border); border-left: 2px solid var(--quincy);
+}
+.neighbor-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.neighbor-card.search-result { border-left-color: var(--chrome); cursor: pointer; }
+.neighbor-card.search-result:hover { border-left-color: var(--neon); }
+.neighbor-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
+.neighbor-art {
+    width: 48px; height: 48px; border-radius: 2px;
+    object-fit: cover; flex-shrink: 0; background: var(--panel2);
+}
+.neighbor-info { flex: 1; min-width: 0; }
+.neighbor-score { font-family: 'Bebas Neue'; font-size: 24px; flex-shrink: 0; }
+.neighbor-score.resonance  { color: var(--resonance); }
+.neighbor-score.locked     { color: var(--neon); }
+.neighbor-score.adjacent   { color: var(--quincy); }
+.neighbor-score.peripheral { color: var(--chrome); }
+.neighbor-score.clash      { color: var(--clash); }
+.neighbor-score.void-sig   { color: var(--bankai); }
+.neighbor-score.pending    { color: var(--dim); font-family: 'Share Tech Mono'; font-size: 13px; }
+.neighbor-title  { font-family: 'Barlow Condensed'; font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--sovereign); }
+.neighbor-artist { font-size: 12px; color: var(--dim); font-family: 'Share Tech Mono'; font-size: 10px; }
+.neighbor-stats  { font-family: 'Share Tech Mono'; font-size: 10px; color: var(--dim); display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+.neighbor-action {
+    margin-top: 9px; padding: 7px; background: none;
+    border: 1px solid var(--border2); color: var(--quincy);
+    font-family: 'Share Tech Mono'; font-size: 10px;
+    cursor: pointer; border-radius: 2px; transition: all 0.15s; width: 100%;
+    letter-spacing: 1px; text-transform: uppercase;
+}
+.neighbor-action:hover { background: rgba(77,184,255,0.1); border-color: var(--quincy); }
+
+/* ── HISTORY ── */
+.history-controls { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+.history-clear-btn {
+    padding: 9px 16px; background: none;
+    border: 1px solid rgba(255,76,43,0.3); color: var(--bankai);
+    font-family: 'Share Tech Mono'; font-size: 10px;
+    cursor: pointer; border-radius: var(--radius); transition: all 0.15s;
+    letter-spacing: 1px; white-space: nowrap; text-transform: uppercase;
+}
+.history-clear-btn:hover { background: rgba(255,76,43,0.08); border-color: var(--bankai); }
+
+/* ── VAULT ── */
+.vault-filter-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.vault-filter-row .sys-input { margin-bottom: 0; flex: 1; }
+.filter-select {
+    padding: 12px 14px; background: var(--panel);
+    border: 1px solid var(--border2); color: var(--text);
+    font-family: 'Share Tech Mono'; font-size: 12px;
+    border-radius: var(--radius); outline: none; cursor: pointer; min-width: 160px;
+}
+.filter-select:focus { border-color: var(--quincy); }
+
+/* ── PLAYLIST INPUT ROW ── */
+.playlist-input-row { display: flex; gap: 10px; margin-bottom: 20px; }
+.playlist-input-row .sys-input { margin-bottom: 0; flex: 1; }
+.load-btn {
+    padding: 12px 20px; background: none;
+    border: 1px solid var(--quincy); color: var(--quincy);
+    font-family: 'Share Tech Mono'; font-size: 11px;
+    cursor: pointer; border-radius: var(--radius); transition: all 0.15s;
+    white-space: nowrap; letter-spacing: 1px; text-transform: uppercase;
+}
+.load-btn:hover { background: var(--quincy); color: var(--void); }
+
+/* ── SPINNER ── */
+.spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--dim2); border-top-color: var(--quincy);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+    padding: 40px; text-align: center; color: var(--dim);
+    font-family: 'Share Tech Mono'; font-size: 13px;
+    letter-spacing: 1px; line-height: 2;
+}
+
+/* ── VERDICT LEGEND ── */
+.verdict-legend {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; margin-bottom: 4px;
+}
+.legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'Share Tech Mono'; font-size: 10px; color: var(--dim);
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 5px 10px; border-radius: 2px; letter-spacing: 0.5px;
+}
+.legend-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── SCORER RADAR POLYGON STYLES ── */
+#scorerRadarSvg .radar-grid    { fill: none; stroke: rgba(77,184,255,0.15); stroke-width: 0.8; }
+#scorerRadarSvg .radar-axes line{ stroke: rgba(77,184,255,0.18); stroke-width: 0.7; }
+#scorerRadarSvg .radar-labels text { fill: rgba(168,212,255,0.55); font-family: 'Share Tech Mono'; font-size: 5px; }
+#scorerRadarSvg .radar-profile { fill: rgba(77,184,255,0.08); stroke: var(--quincy); stroke-width: 1; stroke-dasharray: 2,2; }
+#scorerRadarSvg .radar-track   { fill: rgba(0,229,204,0.22); stroke: var(--neon); stroke-width: 1.5;
+    transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+
+/* ── SCORER MAIN PLANE (radar + score side by side) ── */
+.scorer-main-plane {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding: 28px 24px 12px;
+}
+.scorer-radar-wrap {
+    width: 220px;
+    height: 220px;
+    flex-shrink: 0;
+}
+#scorerRadarSvg { width: 100%; height: 100%; }
+.scorer-score-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 160px;
+}
+/* 7 feature boxes in one row */
+.features-row-7 {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    padding: 0 20px 20px;
+}
+@media (max-width: 900px) {
+    .features-row-7 { grid-template-columns: repeat(4, 1fr); }
+    .scorer-main-plane { flex-direction: column; gap: 16px; }
+}
+.section-div {
+    height: 1px; background: var(--border); margin: 28px 0;
+}
+
+/* ── TRANSPORT DECK ── */
+.transport-btn {
+    flex: 1; padding: 8px 4px;
+    background: rgba(77,184,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--quincy); cursor: pointer;
+    font-family: 'Share Tech Mono'; font-size: 14px;
+    border-radius: var(--radius); transition: all 0.12s;
+    display: flex; align-items: center; justify-content: center;
+}
+.transport-btn img.t-icon {
+    width: 16px; height: 16px;
+    filter: invert(60%) sepia(60%) saturate(400%) hue-rotate(180deg) brightness(1.2);
+    pointer-events: none;
+}
+.transport-btn:hover:not(:disabled) img.t-icon,
+.transport-btn.active-state img.t-icon {
+    filter: invert(85%) sepia(60%) saturate(400%) hue-rotate(180deg) brightness(1.6);
+}
+.transport-btn.transport-main img.t-icon {
+    width: 18px; height: 18px;
+}
+.transport-btn.active-state img.t-icon { filter: invert(80%) sepia(80%) saturate(500%) hue-rotate(130deg) brightness(1.4); }
+.transport-btn.repeat-track img.t-icon  { filter: invert(95%) sepia(80%) saturate(600%) hue-rotate(10deg) brightness(1.3); }
+
+/* ── SLIDER IMPROVEMENTS ── */
+input[type="range"].thick-slider {
+    height: 5px !important;
+    appearance: none; -webkit-appearance: none;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+input[type="range"].thick-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--quincy);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(77,184,255,0.4);
+    transition: box-shadow 0.15s;
+}
+input[type="range"].thick-slider::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 10px rgba(77,184,255,0.7);
+}
+#volumeSlider.thick-slider { accent-color: var(--quincy); }
+#autoAddThresh.thick-slider { accent-color: var(--neon); }
+#autoAddThresh.thick-slider::-webkit-slider-thumb { background: var(--neon); box-shadow: 0 0 6px rgba(0,229,204,0.4); }
+.transport-btn:hover:not(:disabled) {
+    background: rgba(77,184,255,0.15); border-color: var(--quincy);
+    color: var(--sovereign);
+}
+.transport-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.transport-btn.transport-main {
+    flex: 1.6; font-size: 16px;
+    background: rgba(77,184,255,0.1);
+    border-color: var(--quincy);
+}
+.transport-btn.transport-main:hover:not(:disabled) {
+    background: var(--quincy); color: var(--void);
+    box-shadow: 0 0 20px rgba(77,184,255,0.3);
+}
+.transport-btn.active-state {
+    color: var(--neon); border-color: rgba(0,229,204,0.5);
+    background: rgba(0,229,204,0.08);
+}
+.transport-btn.repeat-track {
+    color: var(--chrome); border-color: rgba(245,230,66,0.4);
+    background: rgba(245,230,66,0.06);
+}
+
+
+/* ── SIGNALS PAGE ── */
+.signals-track-row, .signals-artist-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 10px; border-radius: 4px; cursor: default;
+    transition: background 0.15s;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.signals-track-row:hover, .signals-artist-row:hover {
+    background: rgba(77,184,255,0.05);
+}
+.signals-rank {
+    font-family: 'Share Tech Mono'; font-size: 10px;
+    color: var(--dim); min-width: 22px; text-align: right;
+}
+.signals-art {
+    width: 40px; height: 40px; border-radius: 3px;
+    object-fit: cover; flex-shrink: 0;
+    background: rgba(255,255,255,0.04);
+}
+.signals-art-placeholder {
+    width: 40px; height: 40px; border-radius: 3px; flex-shrink: 0;
+    background: rgba(77,184,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--dim);
+}
+.signals-info { flex: 1; min-width: 0; }
+.signals-name {
+    font-family: 'Share Tech Mono'; font-size: 12px;
+    color: var(--text); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis;
+}
+.signals-sub {
+    font-size: 12px; color: var(--dim); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.signals-pop {
+    font-family: 'Share Tech Mono'; font-size: 11px;
+    color: var(--dim); min-width: 28px; text-align: right;
+}
+.signals-pop-bar {
+    width: 36px; height: 3px; background: rgba(255,255,255,0.08);
+    border-radius: 2px; margin-top: 3px; overflow: hidden;
+}
+.signals-pop-fill {
+    height: 100%; background: linear-gradient(90deg, var(--quincy2), var(--quincy));
+    border-radius: 2px; transition: width 0.4s;
+}
+.active-range {
+    border-color: var(--quincy) !important;
+    color: var(--quincy) !important;
+    background: rgba(77,184,255,0.08) !important;
+}
+/* ── AUDIT DIST BAR ── */
+.audit-dist-seg {
+    height: 8px; border-radius: 2px; transition: width 0.5s;
+    position: relative; cursor: default;
+}
+.audit-dist-seg:hover::after {
+    content: attr(data-label);
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: var(--panel2); border: 1px solid var(--border2);
+    color: var(--text); font-family: 'Share Tech Mono'; font-size: 10px;
+    padding: 3px 8px; border-radius: 2px; white-space: nowrap; z-index: 10;
+}
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- Custom titlebar (Electron frameless window) -->
+<div class="titlebar" id="titlebar">
+    <span class="titlebar-title">VENTUS // SYS &nbsp;·&nbsp; AUDIO ENGINE v5</span>
+    <button class="titlebar-btn" onclick="if(window.ventus)window.ventus.minimize()" title="Minimise">─</button>
+    <button class="titlebar-btn" onclick="if(window.ventus)window.ventus.maximize()" title="Maximise">□</button>
+    <button class="titlebar-btn close" onclick="if(window.ventus)window.ventus.close()" title="Close to tray">✕</button>
+</div>
+
+<!-- ────────────────────── SIDEBAR ────────────────────── -->
+<nav class="sidebar">
+    <div class="logo">
+        <div class="logo-mark">VENTUS<span>//</span>SYS</div>
+        <div class="logo-sub">AUDIO ENGINE v5 · 7-VAR MODEL</div>
+    </div>
+    <div class="nav">
+        <div class="nav-item active" data-page="dashboard">
+            <span class="nav-icon">◈</span> DASHBOARD
+        </div>
+        <div class="nav-item" data-page="playlist">
+            <span class="nav-icon">≡</span> MASTER INDEX
+        </div>
+        <div class="nav-item" data-page="vault">
+            <span class="nav-icon">◄</span> TRACK VAULT
+        </div>
+        <div class="nav-item" data-page="discover">
+            <span class="nav-icon">⚲</span> DISCOVER
+        </div>
+        <div class="nav-item" data-page="history">
+            <span class="nav-icon">◷</span> SESSION LOG
+            <span class="nav-badge" id="historyBadge" style="display:none">0</span>
+        </div>
+        <div class="nav-item" data-page="audit">
+            <span class="nav-icon">⊞</span> PLAYLIST AUDIT
+        </div>
+        <div class="nav-item" data-page="scorer">
+            <span class="nav-icon">▲</span> LIVE SCORER
+        </div>
+        <div class="nav-item" data-page="queue">
+            <span class="nav-icon">▷</span> QUEUE
+            <span class="nav-badge" id="queueBadge" style="display:none">0</span>
+        </div>
+        <div class="nav-item" data-page="signals">
+            <span class="nav-icon">◉</span> SIGNALS
+        </div>
+    </div>
+
+    <button class="sync-btn" id="syncBtn" onclick="syncMasterPlaylist()">⟳ SYNC MASTER DATABASE</button>
+    <button class="sync-btn" id="vaultSyncBtn" style="margin-top:0" onclick="syncVaultFromPlaylist()">◈ SYNC VAULT FROM PLAYLIST</button>
+
+    <!-- LIVE FEED -->
+    <div class="live-feed" id="liveModule">
+        <div class="live-tag"><span class="live-dot"></span> LIVE FEED</div>
+        <div class="np-art-wrap" id="npArtWrap">
+            <img class="np-art" id="npArt" src="" alt="">
+            <span class="np-art-score" id="npArtScore"></span>
+        </div>
+        <div class="np-song" id="npName">—</div>
+        <div class="np-artist" id="npArtist">—</div>
+
+        <!-- SEEK BAR (draggable) -->
+        <div class="seek-wrap" id="seekWrap" style="margin:8px 0 2px;cursor:pointer;position:relative;height:12px;display:flex;align-items:center" onmousedown="seekStart(event)">
+            <div style="position:absolute;inset:5px 0;background:var(--dim2);border-radius:1px;overflow:hidden">
+                <div id="seekFill" style="height:100%;background:linear-gradient(90deg,var(--quincy2),var(--quincy));width:0%;border-radius:1px;transition:width 0.3s linear"></div>
+            </div>
+            <div id="seekThumb" style="position:absolute;left:0%;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;background:var(--sovereign);border-radius:50%;pointer-events:none;transition:left 0.3s linear;box-shadow:0 0 6px rgba(77,184,255,0.5)"></div>
+        </div>
+        <div class="progress-time">
+            <span id="progressCurrent">0:00</span>
+            <span id="progressTotal">0:00</span>
+        </div>
+
+        <!-- TRANSPORT CONTROLS -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px">
+            <button class="transport-btn" id="prevBtn" onclick="sendPlayback('prev')" title="Previous"><span class="t-icon-wrap" data-icon="prev">⏮</span></button>
+            <button class="transport-btn transport-main" id="playPauseBtn" onclick="togglePlayPause()" title="Play/Pause"><span class="t-icon-wrap" data-icon="play" id="ppIcon">▶</span></button>
+            <button class="transport-btn" id="nextBtn" onclick="sendPlayback('next')" title="Next"><span class="t-icon-wrap" data-icon="next">⏭</span></button>
+            <button class="transport-btn" id="shuffleBtn" onclick="toggleShuffle()" title="Shuffle" style="font-size:11px;letter-spacing:0"><span class="t-icon-wrap" data-icon="shuffle">⇌</span></button>
+            <button class="transport-btn" id="repeatBtn" onclick="cycleRepeat()" title="Repeat" style="font-size:11px"><span class="t-icon-wrap" data-icon="repeat">↺</span></button>
+        </div>
+
+        <!-- VOLUME SLIDER -->
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+            <span style="font-family:'Share Tech Mono';font-size:11px;color:var(--dim);letter-spacing:1px;flex-shrink:0">VOL</span>
+            <input type="range" id="volumeSlider" min="0" max="100" value="80" step="1"
+                class="thick-slider"
+                style="flex:1;accent-color:var(--quincy);cursor:pointer;background:linear-gradient(90deg,var(--quincy) 80%,var(--dim2) 80%)"
+                oninput="setVolume(this.value);updateSliderBg(this,'var(--quincy)')">
+            <span id="volLabel" style="font-family:'Share Tech Mono';font-size:11px;color:var(--dim);width:30px;text-align:right">80%</span>
+        </div>
+
+        <!-- DEVICE SWITCHER -->
+        <div style="margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+                <span style="font-family:'Share Tech Mono';font-size:11px;color:var(--dim);letter-spacing:1px">DEVICE</span>
+                <button onclick="refreshDevices()" style="background:none;border:none;color:var(--dim);font-size:11px;cursor:pointer;padding:0;line-height:1;transition:color 0.15s" title="Refresh devices" onmouseover="this.style.color='var(--quincy)'" onmouseout="this.style.color='var(--dim)'">⟳</button>
+            </div>
+            <select id="deviceSelect" class="filter-select" style="width:100%;font-size:10px;padding:6px 8px" onchange="switchDevice(this.value)">
+                <option value="">— no devices —</option>
+            </select>
+        </div>
+
+        <div class="toggle-wrap">
+            <span>AUTO-ANALYZE</span>
+            <label class="switch">
+                <input type="checkbox" id="autoAnalyzeToggle" onchange="toggleAutoAnalyze(this)">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="toggle-wrap">
+            <span>AUTO-ADD ≥ <span id="autoAddThreshLabel">75</span>%</span>
+            <label class="switch">
+                <input type="checkbox" id="autoAddToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <input type="range" id="autoAddThresh" min="58" max="90" value="75" step="1"
+            class="thick-slider"
+            style="width:100%;accent-color:var(--neon);margin-bottom:6px;cursor:pointer"
+            oninput="document.getElementById('autoAddThreshLabel').textContent=this.value;updateSliderBg(this,'var(--neon)')">
+        <!-- Preset selector row -->
+        <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+            <select id="autoAddPlaylistPreset" class="sys-input"
+                style="flex:1;font-size:11px;padding:8px 10px;cursor:pointer;background:var(--panel2);color:var(--text);border:1px solid var(--border2);margin-bottom:0"
+                onchange="handlePlaylistPreset(this)">
+            </select>
+            <button onclick="openPresetManager()" title="Manage saved playlists"
+                style="flex-shrink:0;width:32px;height:34px;background:var(--panel2);border:1px solid var(--border2);color:var(--quincy);font-size:14px;cursor:pointer;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;transition:background 0.15s"
+                onmouseover="this.style.background='var(--panel3)'" onmouseout="this.style.background='var(--panel2)'">⊞</button>
+        </div>
+        <!-- Custom ID input (shown when "custom" selected) -->
+        <input type="text" class="sys-input" id="autoAddPlaylistId"
+            value="1rxvJh0wWgia4ylocdC42Y"
+            placeholder="Paste playlist ID…"
+            style="margin-bottom:8px;font-size:11px;padding:8px 10px;display:none">
+
+        <!-- ═══ PRESET MANAGER MODAL ═══ -->
+        <div id="presetManagerOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.85);z-index:9999;align-items:center;justify-content:center">
+            <div style="background:var(--panel);border:1px solid var(--border2);border-radius:4px;width:420px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(77,184,255,0.12)">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--border)">
+                    <span style="font-family:'Share Tech Mono';font-size:11px;letter-spacing:2px;color:var(--quincy)">// PLAYLIST PRESETS</span>
+                    <button onclick="closePresetManager()" style="background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer;line-height:1">✕</button>
+                </div>
+                <div id="presetList" style="flex:1;overflow-y:auto;padding:10px 14px;min-height:60px"></div>
+                <div style="padding:12px 14px;border-top:1px solid var(--border)">
+                    <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:8px">// ADD PRESET</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center">
+                        <input type="text" id="newPresetName" class="sys-input"
+                            placeholder="Name (e.g. SUMMER HEAT)"
+                            style="font-size:11px;padding:7px 9px;margin-bottom:0">
+                        <input type="text" id="newPresetId" class="sys-input"
+                            placeholder="Spotify playlist ID"
+                            style="font-size:11px;padding:7px 9px;margin-bottom:0">
+                        <button onclick="addPreset()"
+                            style="padding:7px 14px;background:var(--quincy2);border:none;color:#fff;font-family:'Share Tech Mono';font-size:11px;cursor:pointer;border-radius:var(--radius);white-space:nowrap;transition:background 0.15s"
+                            onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
+                            onmouseout="this.style.background='var(--quincy2)';this.style.color='#fff'">+ ADD</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Score sparkline -->
+        <div style="margin-bottom:8px">
+            <div style="font-family:'Share Tech Mono';font-size:11px;color:var(--dim);letter-spacing:1px;margin-bottom:5px;">// SESSION TREND</div>
+            <svg id="sparkline" width="100%" height="32" viewBox="0 0 200 32" preserveAspectRatio="none">
+                <polyline id="sparklineLine" points="" fill="none" stroke="var(--quincy)" stroke-width="1.5" stroke-linejoin="round"/>
+                <line id="sparklineRef" x1="0" y1="16" x2="200" y2="16" stroke="rgba(77,184,255,0.15)" stroke-width="1" stroke-dasharray="3,3"/>
+            </svg>
+        </div>
+        <button class="np-btn" id="analyzeBtn" onclick="triggerScore(true)">ANALYZE TRACK</button>
+    </div>
+    <div class="vault-status">
+        <span id="vaultLabel">VAULT: — / —</span>
+        <div class="vault-bar-wrap"><div class="vault-bar" id="vaultBar" style="width:0%"></div></div>
+    </div>
+</nav>
+
+<!-- ────────────────────── MAIN ────────────────────── -->
+<div class="main">
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <div class="page active" id="page-dashboard">
+        <div class="page-title">SYSTEM // <span>DASHBOARD</span></div>
+        <div class="kpi-grid" id="kpis"></div>
+        <div class="charts-row">
+            <div class="chart-panel">
+                <div class="chart-title">// ENERGY DISTRIBUTION</div>
+                <div class="histogram" id="energyHist"></div>
+            </div>
+            <div class="chart-panel">
+                <div class="chart-title">// VALENCE DISTRIBUTION</div>
+                <div class="histogram" id="valenceHist"></div>
+            </div>
+            <div class="chart-panel">
+                <div class="chart-title">// TASTE PROFILE — 7-AXIS — 7-AXIS</div>
+                <div class="dash-radar-wrap">
+                    <svg id="dashRadarSvg" width="160" height="160" viewBox="0 0 100 100">
+                        <!-- Outer ring -->
+                        <polygon id="dashGridOuter" fill="none" stroke="rgba(77,184,255,0.18)" stroke-width="1"/>
+                        <!-- Mid ring -->
+                        <polygon id="dashGridMid" fill="none" stroke="rgba(77,184,255,0.10)" stroke-width="1"/>
+                        <!-- Inner ring -->
+                        <polygon id="dashGridInner" fill="none" stroke="rgba(77,184,255,0.06)" stroke-width="1"/>
+                        <!-- Axis lines -->
+                        <g id="dashAxes" stroke="rgba(77,184,255,0.15)" stroke-width="0.8"></g>
+                        <!-- Profile polygon -->
+                        <polygon id="dashRadarProfile" fill="rgba(77,184,255,0.15)" stroke="var(--quincy)" stroke-width="1.5"/>
+                        <!-- Labels -->
+                        <g id="dashRadarLabels" font-family="Share Tech Mono" font-size="5.5" fill="rgba(168,212,255,0.5)" text-anchor="middle"></g>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="chart-title" style="margin-bottom:12px;">// PROFILE VARIABLES — 7-METRIC PROFILE</div>
+        <div class="profile-row" id="profileStats"></div>
+        <div class="dna-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div class="chart-title" style="margin-bottom:0">// GENRE PROFILE — TASTE SIGNATURE</div>
+                <button class="history-clear-btn" style="border-color:rgba(77,184,255,0.3);color:var(--quincy)" id="rebuildDnaBtn" onclick="rebuildDna()">⟳ REFRESH GENRES</button>
+            </div>
+            <div class="dna-grid" id="dnaGrid"></div>
+        </div>
+        <div class="section-div"></div>
+        <div class="chart-title">// VERDICT SPECTRUM — SCORE ALIGNMENT</div>
+        <div class="verdict-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--resonance)"></div>PERFECT MATCH [90–100] · Closest to your taste profile</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--neon)"></div>STRONG MATCH [75–89] · Core identity match</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--quincy)"></div>ALIGNED [58–74] · Fits the flow, minor variance</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--chrome)"></div>PERIPHERAL [40–57] · Present but doesn't fully commit</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--clash)"></div>DISSONANT [20–39] · Significant deviation</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--bankai)"></div>NO MATCH [0–19] · Total misalignment</div>
+        </div>
+        <div class="chart-title" style="margin-top:20px">// TIER SYSTEM — SCORE PROXIMITY RANK</div>
+        <div class="verdict-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--resonance)"></div>APEX · Score ≥ 90 · Closest to your taste profile</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--neon)"></div>CORE · Score 75–89 · Defines your sound</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--quincy)"></div>ALIGNED · Score 58–74 · Compatible with your profile</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--chrome)"></div>FRINGE · Score 40–57 · Borderline fit</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--bankai)"></div>OUTLIER · Score &lt;40 · Diverges from your profile</div>
+        </div>
+    </div>
+
+    <!-- ═══ MASTER INDEX ═══ -->
+    <div class="page" id="page-playlist">
+        <div class="page-title">MASTER // <span>INDEX</span></div>
+        <div class="list-header" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 80px 80px;">
+            <div>#</div><div>TRACK</div><div>KEY</div>
+            <div>NRG</div><div>VAL</div><div>DNC</div><div>BPM</div>
+            <div>ACST</div><div>SCORE</div>
+        </div>
+        <div id="trackList"></div>
+    </div>
+
+    <!-- ═══ TRACK VAULT ═══ -->
+    <div class="page" id="page-vault">
+        <div class="page-title">SIGNAL // <span>VAULT</span></div>
+        <div class="vault-filter-row">
+            <input type="text" class="sys-input" id="vaultSearch"
+                placeholder="Search track, artist, era, phase tag…" oninput="renderVault()">
+            <select class="filter-select" id="vaultSort" onchange="renderVault()">
+                <option value="num">ORDER: DEFAULT</option>
+                <option value="score_desc">SCORE: HIGH → LOW</option>
+                <option value="score_asc">SCORE: LOW → HIGH</option>
+                <option value="energy_desc">ENERGY: HIGH → LOW</option>
+                <option value="valence_desc">VALENCE: HIGH → LOW</option>
+                <option value="bpm_desc">BPM: HIGH → LOW</option>
+            </select>
+        </div>
+        <div class="list-header" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
+            <div>#</div><div>TRACK</div><div>KEY</div>
+            <div>NRG</div><div>VAL</div><div>DNC</div><div>BPM</div><div>VERDICT SCORE</div>
+        </div>
+        <div id="vaultList"></div>
+    </div>
+
+    <!-- ═══ DISCOVER ═══ -->
+    <div class="page" id="page-discover">
+        <div class="page-title">SIGNAL // <span>DISCOVER</span></div>
+        <div class="discover-search-row">
+            <input type="text" class="sys-input" id="discoverSearch"
+                placeholder="Search Spotify: artist, song, or paste track ID…"
+                onkeydown="if(event.key==='Enter')runDiscoverSearch()">
+            <button class="search-btn" id="discoverSearchBtn" onclick="runDiscoverSearch()">SEARCH ⟶</button>
+        </div>
+        <div id="discoverSearchResults"></div>
+        <div class="discover-section-title" id="neighborsLabel">// CLOSEST MATCHES IN YOUR INDEX</div>
+        <div id="neighborGrid" class="neighbor-grid">
+            <div class="empty-state">Analyze a track on the Scorer tab first — or search above — to find your closest matches.</div>
+        </div>
+    </div>
+
+    <!-- ═══ SESSION LOG ═══ -->
+    <div class="page" id="page-history">
+        <div class="page-title">SESSION // <span>LOG</span></div>
+        <div class="history-controls">
+            <span id="historyCount" style="font-family:'Share Tech Mono';font-size:11px;color:var(--dim);letter-spacing:1px;"></span>
+            <button class="history-clear-btn" onclick="exportSessionLog()">↓ EXPORT CSV</button>
+            <button class="history-clear-btn" onclick="clearHistory()">✕ CLEAR SESSION</button>
+        </div>
+        <div class="list-header" style="grid-template-columns: 72px 1fr 88px 170px 130px;">
+            <div>TIME</div><div>TRACK</div><div>SCORE</div><div>SOURCE</div><div>VERDICT</div>
+        </div>
+        <div id="historyList">
+            <div class="empty-state">No signals logged this session.</div>
+        </div>
+    </div>
+
+    <!-- ═══ PLAYLIST AUDIT ═══ -->
+    <div class="page" id="page-audit">
+        <div class="page-title">PLAYLIST // <span>AUDIT</span></div>
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;margin-bottom:20px;align-items:start">
+            <input type="text" class="sys-input" id="auditPlaylistId"
+                style="margin-bottom:0"
+                placeholder="Paste Spotify Playlist ID to audit…"
+                onkeydown="if(event.key==='Enter')runPlaylistAudit()">
+            <button class="search-btn" id="auditBtn" onclick="runPlaylistAudit()">AUDIT ⟶</button>
+        </div>
+        <div id="auditSummary" style="display:none;margin-bottom:20px">
+            <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px" id="auditKpis"></div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:16px" id="auditDistBar"></div>
+        </div>
+        <div class="list-header" style="grid-template-columns:48px 1fr 96px 130px 68px 68px 92px" id="auditHeader" style="display:none">
+            <div>#</div><div>TRACK</div><div>KEY</div><div>VERDICT</div><div>NRG</div><div>VAL</div><div>SCORE</div>
+        </div>
+        <div id="auditList"><div class="empty-state">Enter a Spotify playlist ID above and hit AUDIT to analyse every track against your centroid.</div></div>
+    </div>
+
+    <!-- ═══ LIVE SCORER ═══ -->
+    <div class="page" id="page-scorer">
+        <div class="page-title">LIVE // <span>SCORER</span></div>
+        <div class="scorer-layout">
+            <!-- LEFT: Score + metrics -->
+            <div class="score-box" id="scoreBox">
+                <div class="score-idle" id="scoreIdle">
+                    // STANDBY<br>
+                    PLAY SOMETHING ON SPOTIFY<br>
+                    THEN HIT ANALYZE SIGNAL
+                </div>
+                <div id="scoreResult" style="display:none">
+                    <!-- SCORER MAIN PLANE: radar LEFT, score RIGHT -->
+                    <div class="scorer-main-plane">
+                        <!-- 7-axis radar -->
+                        <div class="scorer-radar-wrap">
+                            <svg id="scorerRadarSvg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                <!-- Grid rings -->
+                                <polygon id="srGridOuter" class="radar-grid"/>
+                                <polygon id="srGridMid"   class="radar-grid"/>
+                                <polygon id="srGridInner" class="radar-grid"/>
+                                <!-- Axis spokes -->
+                                <g id="srAxes" class="radar-axes"></g>
+                                <!-- Labels -->
+                                <g id="srLabels" class="radar-labels" font-size="5.5" text-anchor="middle" dominant-baseline="middle"></g>
+                                <!-- Profile fill -->
+                                <polygon id="srProfile" class="radar-profile"/>
+                                <!-- Track fill -->
+                                <polygon id="srTrack"   class="radar-track"/>
+                            </svg>
+                        </div>
+                        <!-- Score + verdict -->
+                        <div class="scorer-score-col">
+                            <div class="score-num" id="bigScore">--</div>
+                            <div class="verdict"   id="verdictLabel"></div>
+                            <div class="method-label" id="methodLabel"></div>
+                        </div>
+                    </div>
+                    <!-- 7 feature boxes in one row -->
+                    <div class="features-row-7" id="featuresRow"></div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Art + compare bars -->
+            <div class="score-sidebar">
+                <div class="scorer-art-wrap" id="scorerArtWrap">
+                    <img id="scorerArt" class="scorer-art" src="" alt="">
+                    <div id="scorerTrack" class="scorer-track-name"></div>
+                    <div id="scorerArtist" class="scorer-track-artist"></div>
+                </div>
+                <div class="profile-compare" id="compareBox">
+                    <div class="compare-title">// SIGNAL VS. YOUR CENTROID</div>
+                    <div class="compare-row">
+                        <div class="compare-labels"><span>ENERGY</span><span class="compare-track-val" id="cEnergy">--</span></div>
+                        <div class="compare-bars">
+                            <div class="compare-profile-bar" id="cpEnergy"></div>
+                            <div class="compare-track-bar" id="ctEnergy"></div>
+                        </div>
+                    </div>
+                    <div class="compare-row">
+                        <div class="compare-labels"><span>VALENCE</span><span class="compare-track-val" id="cValence">--</span></div>
+                        <div class="compare-bars">
+                            <div class="compare-profile-bar" id="cpValence"></div>
+                            <div class="compare-track-bar" id="ctValence"></div>
+                        </div>
+                    </div>
+                    <div class="compare-row">
+                        <div class="compare-labels"><span>DANCEABILITY</span><span class="compare-track-val" id="cDance">--</span></div>
+                        <div class="compare-bars">
+                            <div class="compare-profile-bar" id="cpDance"></div>
+                            <div class="compare-track-bar" id="ctDance"></div>
+                        </div>
+                    </div>
+                    <div class="compare-row">
+                        <div class="compare-labels"><span>ACOUSTICNESS</span><span class="compare-track-val" id="cAcoustic">--</span></div>
+                        <div class="compare-bars">
+                            <div class="compare-profile-bar" id="cpAcoustic"></div>
+                            <div class="compare-track-bar" id="ctAcoustic"></div>
+                        </div>
+                    </div>
+                    <div class="compare-row">
+                        <div class="compare-labels"><span>INSTRUMENTAL</span><span class="compare-track-val" id="cInstrumental">--</span></div>
+                        <div class="compare-bars">
+                            <div class="compare-profile-bar" id="cpInstrumental"></div>
+                            <div class="compare-track-bar" id="ctInstrumental"></div>
+                        </div>
+                    </div>
+                    <div class="compare-row">
+                        <div class="compare-labels"><span>LOUDNESS (dB)</span><span class="compare-track-val" id="cLoudness">--</span></div>
+                        <div class="compare-bars">
+                            <div class="compare-profile-bar" id="cpLoudness"></div>
+                            <div class="compare-track-bar" id="ctLoudness"></div>
+                        </div>
+                    </div>
+                    <div class="compare-row">
+                        <div class="compare-labels"><span>BPM CADENCE</span><span class="compare-track-val" id="cBpm">--</span></div>
+                        <div class="compare-bars">
+                            <div class="compare-profile-bar" id="cpBpm"></div>
+                            <div class="compare-track-bar" id="ctBpm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ═══ QUEUE ANALYZER ═══ -->
+    <div class="page" id="page-queue">
+        <div class="page-title">QUEUE // <span>ARCHITECT</span></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+            <button class="search-btn" id="queueRefreshBtn" onclick="loadQueue()">⟳ REFRESH QUEUE</button>
+            <span id="queueStatus" style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);letter-spacing:1px"></span>
+        </div>
+        <div class="list-header" style="grid-template-columns:44px 1fr 96px 68px 68px 100px 100px">
+            <div>#</div><div>TRACK</div><div>KEY</div>
+            <div>NRG</div><div>VAL</div><div>VERDICT</div><div>SCORE</div>
+        </div>
+        <div id="queueList">
+            <div class="empty-state">Open the QUEUE tab to preview and score your upcoming tracks.</div>
+        </div>
+    </div>
+
+
+    <div class="page" id="page-signals">
+        <div class="page-title">SIGNALS // <span>TOP TRACKS &amp; ARTISTS</span></div>
+
+        <!-- Time range selector -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;flex-wrap:wrap">
+            <div style="display:flex;gap:6px">
+                <button class="search-btn signals-range active-range" data-range="short_term" onclick="setSignalsRange(this,'short_term')">4 WEEKS</button>
+                <button class="search-btn signals-range" data-range="medium_term" onclick="setSignalsRange(this,'medium_term')">6 MONTHS</button>
+                <button class="search-btn signals-range" data-range="long_term" onclick="setSignalsRange(this,'long_term')">ALL TIME</button>
+            </div>
+            <span id="signalsStatus" style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);letter-spacing:1px;margin-left:auto"></span>
+        </div>
+
+        <!-- Two-column grid: tracks left, artists right -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+            <!-- TOP TRACKS -->
+            <div>
+                <div style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);letter-spacing:2px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:8px">TOP TRACKS // 50</div>
+                <div id="signalsTracksList"><div class="empty-state">Open SIGNALS to load.</div></div>
+            </div>
+
+            <!-- TOP ARTISTS -->
+            <div>
+                <div style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);letter-spacing:2px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:8px">TOP ARTISTS // 50</div>
+                <div id="signalsArtistsList"><div class="empty-state">Open SIGNALS to load.</div></div>
+            </div>
+
+        </div>
+    </div>
+</div><!-- end .main -->
+
+<script>
+// ═══════════════════════════════════════════════════════════ STATE ═══
+let currentId            = null;
+let currentTrackObj      = null;
+let vibeProfile          = {};
+let tracks               = [];
+let vaultData            = [];
+let historyLog           = [];
+let autoAnalyzeEnabled   = false;
+let lastAnalyzedFeatures = null;
+let pollTimer            = null;
+
+// Transport state
+let isPlaying       = false;
+let shuffleState    = false;
+let repeatState     = 'off';   // 'off' | 'context' | 'track'
+let currentDuration = 0;
+let currentProgress = 0;
+let seekDragging    = false;
+let sseSource       = null;
+let progressTicker  = null;
+
+// ═══════════════════════════════════════════════════════════ UTILS ═══
+
+function showToast(msg, type = 'ok') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = type === 'error' ? 'error' : type === 'warn' ? 'warn' : '';
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 5500);
+}
+
+function fmtMs(ms) {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+// Maps backend verdict string → CSS class
+function verdictClass(v) {
+    if (!v) return 'unrated';
+    const vl = v.toUpperCase().trim();
+    if (vl === 'PERFECT MATCH')  return 'resonance';
+    if (vl === 'STRONG MATCH')     return 'locked';
+    if (vl === 'ALIGNED')  return 'adjacent';
+    if (vl === 'PERIPHERAL')      return 'peripheral';
+    if (vl === 'DISSONANT') return 'clash';
+    if (vl === 'NO MATCH')     return 'void-sig';
+    if (vl === 'ERROR')           return 'void-sig';
+    return 'unrated';
+}
+
+// Quick 7-var score for master index / vault display (mirrors backend weights)
+function calcScore(e, v, d, ac, ins, lo, bpm) {
+    if (!vibeProfile || Object.keys(vibeProfile).length === 0) return 0;
+    const p = vibeProfile;
+    const normLoud = db => Math.max(0, Math.min(100, ((db + 30) / 30) * 100));
+    const normBpm  = (b, ref) => Math.min(100, Math.abs(b - ref) / 80.0 * 100);
+    const diffE   = Math.abs(e  - (p.energy          || 0));
+    const diffV   = Math.abs(v  - (p.valence         || 0));
+    const diffD   = Math.abs(d  - (p.dance           || 0));
+    const diffAc  = Math.abs(ac - (p.acousticness    || 0));
+    const diffIn  = Math.abs(ins- (p.instrumentalness|| 0));
+    const diffLo  = Math.abs(normLoud(lo) - normLoud(p.loudness || -8));
+    const diffBpm = normBpm(bpm, p.bpm || 120);
+    const totalW  = 1.0 + 1.0 + 0.85 + 0.70 + 0.70 + 0.60 + 0.45;
+    const wVar    = (diffE*1.0 + diffV*1.0 + diffD*0.85 + diffAc*0.70 + diffIn*0.70 + diffLo*0.60 + diffBpm*0.45) / totalW;
+    return Math.max(0, Math.min(100, Math.round(100 - wVar * 2.0)));
+}
+
+function scoreToVerdict(score) {
+    if (score >= 90) return 'PERFECT MATCH';
+    if (score >= 75) return 'STRONG MATCH';
+    if (score >= 58) return 'ALIGNED';
+    if (score >= 40) return 'PERIPHERAL';
+    if (score >= 20) return 'DISSONANT';
+    return 'NO MATCH';
+}
+
+// Tiering: physics-based on actual score vs centroid
+// APEX [90-100] CORE [75-89] ALIGNED [58-74] FRINGE [40-57] OUTLIER [<40]
+function getTier(score) {
+    if (score >= 90) return { tier: 'APEX',    color: 'var(--resonance)' };
+    if (score >= 75) return { tier: 'CORE',    color: 'var(--neon)'      };
+    if (score >= 58) return { tier: 'ALIGNED', color: 'var(--quincy)'    };
+    if (score >= 40) return { tier: 'FRINGE',  color: 'var(--chrome)'    };
+    return               { tier: 'OUTLIER', color: 'var(--bankai)'    };
+}
+
+function deltaClass(delta, tight = 15, loose = 30) {
+    if (delta <= tight) return 'good';
+    if (delta <= loose) return 'med';
+    return 'bad';
+}
+
+function barClass(diff, tight = 15, loose = 30) {
+    if (diff <= tight) return 'green';
+    if (diff <= loose) return '';
+    return 'red';
+}
+
+// ═══════════════════════════════════════════════════════════ NAV ═══
+
+document.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => showPage(el.dataset.page));
+});
+
+function showPage(p) {
+    document.querySelectorAll('.page').forEach(pg => pg.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(ni => ni.classList.remove('active'));
+    const pg = document.getElementById('page-' + p);
+    if (pg) pg.classList.add('active');
+    const ni = document.querySelector(`.nav-item[data-page="${p}"]`);
+    if (ni) ni.classList.add('active');
+    if (p === 'vault')   renderVault();
+    if (p === 'history') renderHistory();
+    if (p === 'queue')   loadQueue();
+    if (p === 'signals') loadSignals();
+}
+
+// ═══════════════════════════════════════════════════════════ RADAR (7-AXIS) ═══
+
+const RADAR_CX = 50, RADAR_CY = 50, RADAR_R = 38;
+const RADAR_AXES = ['NRG','VAL','DNC','ACST','INST','LOUD','BPM'];
+const N_AXES = 7;
+
+function heptPts(vals, r) {
+    // vals: array of 0-1 normalized values, one per axis
+    // axes start at top (-90°) going clockwise
+    return vals.map((v, i) => {
+        const angle = (Math.PI * 2 * i / N_AXES) - Math.PI / 2;
+        return `${RADAR_CX + r * v * Math.cos(angle)},${RADAR_CY + r * v * Math.sin(angle)}`;
+    }).join(' ');
+}
+
+function buildDashRadar(profile) {
+    const normLoud = db => Math.max(0, Math.min(1, ((db + 30) / 30)));
+    const normBpm  = bpm => Math.min(1, bpm / 200);
+
+    const vals = [
+        (profile.energy          || 0) / 100,
+        (profile.valence         || 0) / 100,
+        (profile.dance           || 0) / 100,
+        (profile.acousticness    || 0) / 100,
+        (profile.instrumentalness|| 0) / 100,
+        normLoud(profile.loudness || -8),
+        normBpm(profile.bpm      || 120),
+    ];
+
+    // Grid rings
+    document.getElementById('dashGridOuter').setAttribute('points', heptPts(Array(N_AXES).fill(1), RADAR_R));
+    document.getElementById('dashGridMid'  ).setAttribute('points', heptPts(Array(N_AXES).fill(1), RADAR_R * 0.6));
+    document.getElementById('dashGridInner').setAttribute('points', heptPts(Array(N_AXES).fill(1), RADAR_R * 0.3));
+
+    // Axis spokes
+    const axesG = document.getElementById('dashAxes');
+    axesG.innerHTML = vals.map((_, i) => {
+        const angle = (Math.PI * 2 * i / N_AXES) - Math.PI / 2;
+        const x2 = RADAR_CX + RADAR_R * Math.cos(angle);
+        const y2 = RADAR_CY + RADAR_R * Math.sin(angle);
+        return `<line x1="${RADAR_CX}" y1="${RADAR_CY}" x2="${x2}" y2="${y2}"/>`;
+    }).join('');
+
+    // Labels
+    const lblG = document.getElementById('dashRadarLabels');
+    lblG.innerHTML = RADAR_AXES.map((lbl, i) => {
+        const angle = (Math.PI * 2 * i / N_AXES) - Math.PI / 2;
+        const dist = RADAR_R + 7;
+        let x = RADAR_CX + dist * Math.cos(angle);
+        let y = RADAR_CY + dist * Math.sin(angle) + 1.8; // slight baseline adjust
+        return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}">${lbl}</text>`;
+    }).join('');
+
+    // Profile polygon
+    document.getElementById('dashRadarProfile').setAttribute('points', heptPts(vals, RADAR_R));
+}
+
+// ═══════════════════════════════════════════ SCORER RADAR (7-AXIS) ═══
+
+const SR_CX = 50, SR_CY = 50, SR_R = 36;
+const SR_AXES = ['NRG','VAL','DNC','LOUD','BPM','ACST','INST'];
+
+function srPts(vals, r) {
+    return vals.map((v, i) => {
+        const angle = (Math.PI * 2 * i / 7) - Math.PI / 2;
+        return `${SR_CX + r * v * Math.cos(angle)},${SR_CY + r * v * Math.sin(angle)}`;
+    }).join(' ');
+}
+
+function buildScorerRadar(profileVals, trackVals) {
+    // profileVals / trackVals: arrays of 7 values normalised 0-1
+    // axes: NRG, VAL, DNC, LOUD, BPM, ACST, INST
+    document.getElementById('srGridOuter').setAttribute('points', srPts(Array(7).fill(1),   SR_R));
+    document.getElementById('srGridMid'  ).setAttribute('points', srPts(Array(7).fill(0.6), SR_R));
+    document.getElementById('srGridInner').setAttribute('points', srPts(Array(7).fill(0.3), SR_R));
+
+    const axesG = document.getElementById('srAxes');
+    axesG.innerHTML = SR_AXES.map((_, i) => {
+        const angle = (Math.PI * 2 * i / 7) - Math.PI / 2;
+        return `<line x1="${SR_CX}" y1="${SR_CY}"
+                      x2="${(SR_CX + SR_R * Math.cos(angle)).toFixed(2)}"
+                      y2="${(SR_CY + SR_R * Math.sin(angle)).toFixed(2)}"/>`;
+    }).join('');
+
+    const lblG = document.getElementById('srLabels');
+    lblG.innerHTML = SR_AXES.map((lbl, i) => {
+        const angle = (Math.PI * 2 * i / 7) - Math.PI / 2;
+        const dist = SR_R + 8;
+        return `<text x="${(SR_CX + dist * Math.cos(angle)).toFixed(1)}"
+                      y="${(SR_CY + dist * Math.sin(angle)).toFixed(1)}">${lbl}</text>`;
+    }).join('');
+
+    document.getElementById('srProfile').setAttribute('points', srPts(profileVals, SR_R));
+    // Animate track polygon in slightly after
+    document.getElementById('srTrack').setAttribute('points', srPts(Array(7).fill(0), SR_R));
+    setTimeout(() => {
+        document.getElementById('srTrack').setAttribute('points', srPts(trackVals, SR_R));
+    }, 80);
+}
+
+// ═══════════════════════════════════════════════════════════ HISTOGRAM ═══
+
+function buildHistogram(containerId, values, buckets, min, max) {
+    const step = (max - min) / buckets;
+    const counts = Array(buckets).fill(0);
+    values.forEach(v => {
+        const b = Math.min(buckets - 1, Math.floor((v - min) / step));
+        if (b >= 0) counts[b]++;
+    });
+    const peak = Math.max(...counts, 1);
+    document.getElementById(containerId).innerHTML = counts.map((c, i) => {
+        const h = Math.max(3, Math.round((c / peak) * 96));
+        const lbl = Math.round(min + i * step);
+        return `<div class="hist-col">
+            <div class="hist-bar" style="height:${h}px" title="${c} tracks"></div>
+            <div class="hist-lbl">${lbl}</div>
+        </div>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════ LOAD DATA ═══
+
+async function loadData() {
+    try {
+        const [tRes, pRes, vRes, vDataRes, dnaRes] = await Promise.all([
+            fetch('/api/tracks'),
+            fetch('/api/vibe_profile'),
+            fetch('/api/vault_stats'),
+            fetch('/api/vault_data'),
+            fetch('/api/vibe_dna')
+        ]);
+
+        // Parse all responses before touching the DOM
+        let _tracks, _profile, _vault, _vaultData, _dna;
+        try { _tracks    = await tRes.json();    } catch(e) { console.error('tracks parse',e);   _tracks = []; }
+        try { _profile   = await pRes.json();    } catch(e) { console.error('profile parse',e);  _profile = {}; }
+        try { _vault     = await vRes.json();    } catch(e) { console.error('vault parse',e);    _vault = {cached:0}; }
+        try { _vaultData = await vDataRes.json();} catch(e) { console.error('vaultData parse',e);_vaultData = []; }
+        try { _dna       = await dnaRes.json();  } catch(e) { console.error('dna parse',e);      _dna = []; }
+
+        tracks      = Array.isArray(_tracks) ? _tracks : [];
+        vibeProfile = (_profile && typeof _profile === 'object' && !_profile.error) ? _profile : {};
+        vaultData   = Array.isArray(_vaultData) ? _vaultData : [];
+        const vault = _vault || {cached:0};
+        const dna   = Array.isArray(_dna) ? _dna : [];
+
+        console.log('[loadData] tracks:', tracks.length, 'profile:', vibeProfile, 'vault:', vault.cached);
+
+        const cached = vault.cached || 0;
+        const total  = tracks.length;
+
+        const avgE = total ? Math.round(tracks.reduce((a,b)=>a+b.energy,0)/total)  : 0;
+        const avgV = total ? Math.round(tracks.reduce((a,b)=>a+b.valence,0)/total) : 0;
+        const avgB = total ? Math.round(tracks.reduce((a,b)=>a+b.bpm,0)/total)     : 0;
+        const resonanceCount = tracks.filter(t => calcScore(t.energy,t.valence,t.dance,t.acousticness,t.instrumentalness,t.loudness,t.bpm) >= 90).length;
+        const lockedCount    = tracks.filter(t => { const s = calcScore(t.energy,t.valence,t.dance,t.acousticness,t.instrumentalness,t.loudness,t.bpm); return s >= 75 && s < 90; }).length;
+
+        try {
+            document.getElementById('kpis').innerHTML = `
+                <div class="kpi"><div class="kpi-label">TOTAL TRACKS</div><div class="kpi-val">${total}</div></div>
+                <div class="kpi"><div class="kpi-label">AVG ENERGY</div><div class="kpi-val chrome">${avgE}%</div></div>
+                <div class="kpi"><div class="kpi-label">AVG VALENCE</div><div class="kpi-val gold">${avgV}%</div></div>
+                <div class="kpi"><div class="kpi-label">PERFECT MATCH</div><div class="kpi-val cyan">${resonanceCount}</div></div>
+                <div class="kpi"><div class="kpi-label">STRONG MATCH</div><div class="kpi-val">${lockedCount}</div></div>
+                <div class="kpi"><div class="kpi-label">AVG BPM</div><div class="kpi-val">${avgB}</div></div>
+                <div class="kpi"><div class="kpi-label">VAULT INDEXED</div><div class="kpi-val">${cached}</div></div>
+                <div class="kpi"><div class="kpi-label">COVERAGE</div><div class="kpi-val" style="font-size:36px">${total ? Math.round((cached/total)*100) : 0}%</div></div>
+            `;
+        } catch(e) { console.error('kpis render', e); }
+
+        try { buildHistogram('energyHist',  tracks.map(t=>t.energy),  10, 0, 100); } catch(e) { console.warn('energyHist',e); }
+        try { buildHistogram('valenceHist', tracks.map(t=>t.valence), 10, 0, 100); } catch(e) { console.warn('valenceHist',e); }
+        try { buildDashRadar(vibeProfile); } catch(e) { console.warn('dashRadar',e); }
+
+        try {
+            const profVars = [
+                { label: 'ENERGY AVG',    key: 'energy',          val: vibeProfile.energy          || 0, pct: vibeProfile.energy          || 0 },
+                { label: 'VALENCE AVG',   key: 'valence',         val: vibeProfile.valence         || 0, pct: vibeProfile.valence         || 0 },
+                { label: 'DANCEABILITY',       key: 'dance',           val: vibeProfile.dance           || 0, pct: vibeProfile.dance           || 0 },
+                { label: 'BPM (NORM)',         key: 'bpm',             val: vibeProfile.bpm             || 0, pct: Math.min(100, ((vibeProfile.bpm||0)/200)*100) },
+                { label: 'ACOUSTICNESS',       key: 'acousticness',    val: vibeProfile.acousticness    || 0, pct: vibeProfile.acousticness    || 0 },
+                { label: 'INSTRUMENTAL',       key: 'instrumentalness',val: vibeProfile.instrumentalness|| 0, pct: vibeProfile.instrumentalness|| 0 },
+                { label: 'LOUDNESS AVG',       key: 'loudness',        val: vibeProfile.loudness        || 0, pct: Math.max(0,Math.min(100,(((vibeProfile.loudness||0)+30)/30)*100)) },
+            ];
+            document.getElementById('profileStats').innerHTML = profVars.map(pv => {
+                const display = pv.key === 'loudness'
+                    ? Number(pv.val).toFixed(1)
+                    : Math.round(pv.val) + (pv.key === 'bpm' ? '' : '%');
+                return `
+                <div class="profile-stat">
+                    <div class="profile-stat-label">${pv.label}</div>
+                    <div class="profile-stat-val">${display}</div>
+                    <div class="profile-bar"><div class="profile-fill" style="width:${pv.pct}%"></div></div>
+                </div>`;
+            }).join('');
+        } catch(e) { console.error('profileStats render', e); }
+
+        try {
+            if (Array.isArray(dna) && dna.length > 0) {
+                document.getElementById('dnaGrid').innerHTML = dna.map(tag => `<div class="dna-tag">${tag}</div>`).join('');
+            } else {
+                document.getElementById('dnaGrid').innerHTML = '<div style="font-family:\'Share Tech Mono\';font-size:11px;color:var(--dim);">No DNA extracted yet. Run learn.py or sync your playlist.</div>';
+            }
+        } catch(e) { console.error('dnaGrid render', e); }
+
+        try {
+            document.getElementById('trackList').innerHTML = tracks.map(t => {
+                const score = calcScore(t.energy, t.valence, t.dance, t.acousticness, t.instrumentalness, t.loudness, t.bpm);
+                const vc   = verdictClass(scoreToVerdict(score));
+                const tier = getTier(score);
+                return `
+                <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 80px 80px;">
+                    <div class="col-num">${t.num}</div>
+                    <div class="col-info">
+                        <div class="col-name">${escHtml(t.song)}</div>
+                        <div class="col-sub">${escHtml(t.artist)} <span class="phase-tag" style="border-color:${tier.color}33;color:${tier.color}">${tier.tier}</span></div>
+                    </div>
+                    <div class="col-key">${t.key || '--'}</div>
+                    <div class="col-stat">${t.energy}%</div>
+                    <div class="col-stat">${t.valence}%</div>
+                    <div class="col-stat">${t.dance}%</div>
+                    <div class="col-stat">${t.bpm || '--'}</div>
+                    <div class="col-stat" style="color:var(--dim)">${t.acousticness || '--'}%</div>
+                    <div class="col-score ${vc}">${score}%</div>
+                </div>`;
+            }).join('') || '<div class="empty-state">No tracks loaded. Check Flask server.</div>';
+        } catch(e) { console.error('trackList render', e); }
+
+        document.getElementById('vaultLabel').textContent = `VAULT: ${cached} / ${total}`;
+        document.getElementById('vaultBar').style.width = total ? `${Math.min(100,(cached/total)*100)}%` : '0%';
+
+        try { renderVault(); } catch(e) { console.error('renderVault', e); }
+
+    } catch (err) {
+        console.error('loadData error:', err);
+        showToast('// DATA LOAD FAILED — check Flask server', 'error');
+    }
+}
+
+function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════ VAULT ═══
+
+function renderVault() {
+    const q    = (document.getElementById('vaultSearch')?.value || '').toLowerCase();
+    const sort = document.getElementById('vaultSort')?.value || 'num';
+
+    let filtered = tracks.filter(t => {
+        if (!q) return true;
+        return t.song.toLowerCase().includes(q) ||
+               t.artist.toLowerCase().includes(q);
+    });
+
+    filtered = filtered.map(t => ({ ...t, _score: calcScore(t.energy, t.valence, t.dance, t.acousticness, t.instrumentalness, t.loudness, t.bpm) }));
+
+    if (sort === 'score_desc')   filtered.sort((a,b) => b._score - a._score);
+    else if (sort === 'score_asc')    filtered.sort((a,b) => a._score - b._score);
+    else if (sort === 'energy_desc')  filtered.sort((a,b) => b.energy - a.energy);
+    else if (sort === 'valence_desc') filtered.sort((a,b) => b.valence - a.valence);
+    else if (sort === 'bpm_desc')     filtered.sort((a,b) => b.bpm - a.bpm);
+
+    const html = filtered.map(t => {
+        const tier = getTier(t._score);
+        const vc = verdictClass(scoreToVerdict(t._score));
+        return `
+        <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
+            <div class="col-num">${t.num}</div>
+            <div class="col-info">
+                <div class="col-name">${escHtml(t.song)}</div>
+                <div class="col-sub">${escHtml(t.artist)} <span class="phase-tag" style="border-color:${tier.color}33;color:${tier.color}">${tier.tier}</span></div>
+            </div>
+            <div class="col-key">${t.key || '--'}</div>
+            <div class="col-stat">${t.energy}%</div>
+            <div class="col-stat">${t.valence}%</div>
+            <div class="col-stat">${t.dance}%</div>
+            <div class="col-stat">${t.bpm || '--'}</div>
+            <div class="col-score ${vc}">${t._score}%</div>
+        </div>`;
+    }).join('');
+
+    const el = document.getElementById('vaultList');
+    el.innerHTML = html || '<div class="empty-state">No matching records found.</div>';
+}
+
+// ═══════════════════════════════════════════════════════════ HISTORY ═══
+
+function renderHistory() {
+    const badge = document.getElementById('historyBadge');
+    const count = historyLog.length;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'block';
+        document.getElementById('historyCount').textContent = `// ${count} SIGNALS LOGGED`;
+    } else {
+        badge.style.display = 'none';
+        document.getElementById('historyCount').textContent = '';
+    }
+
+    if (count === 0) {
+        document.getElementById('historyList').innerHTML = '<div class="empty-state">No signals logged this session.</div>';
+        return;
+    }
+
+    document.getElementById('historyList').innerHTML = historyLog.map(h => {
+        const d  = new Date(h.time);
+        const ts = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const vc = verdictClass(h.verdict);
+        let scoreDisp = `<span class="col-score unrated">--</span>`;
+        if (h.score !== null)     scoreDisp = `<span class="col-score ${vc}">${h.score}%</span>`;
+        else if (h.verdict === 'ERROR') scoreDisp = `<span class="col-score void-sig">ERR</span>`;
+
+        return `
+        <div class="list-item" style="grid-template-columns: 72px 1fr 88px 170px 130px;">
+            <div class="col-num">${ts}</div>
+            <div class="col-info">
+                <div class="col-name">${escHtml(h.name)}</div>
+                <div class="col-sub">${escHtml(h.artist)}</div>
+            </div>
+            <div class="col-stat">${scoreDisp}</div>
+            <div class="col-stat" style="color:var(--dim);font-family:'Share Tech Mono';font-size:10px;">${h.method || '—'}</div>
+            <div class="col-stat ${vc}" style="font-family:'Share Tech Mono';font-size:11px;font-weight:bold;">${h.verdict || 'UNRATED'}</div>
+        </div>`;
+    }).join('');
+}
+
+function clearHistory() {
+    historyLog = [];
+    renderHistory();
+    showToast('// SESSION LOG CLEARED', 'warn');
+}
+
+// ═══════════════════════════════════════════════════════════ DISCOVER ═══
+
+function renderNeighbors(features) {
+    if (!features || !tracks.length) return;
+    // 7-var weighted Euclidean distance (normalized), mirrors scoring weights
+    const normLoud = db => Math.max(0, Math.min(100, ((db + 30) / 30) * 100));
+    const normBpm  = bpm => Math.min(100, (bpm / 200) * 100);
+    const fE   = features.Energy      || features.energy      || 0;
+    const fV   = features.Valence     || features.valence     || 0;
+    const fD   = features.Dance       || features.dance       || 0;
+    const fAc  = features.Acoustic    || features.acousticness|| 0;
+    const fIn  = features.Instrumental|| features.instrumentalness || 0;
+    const fLo  = normLoud(features.Loudness || features.loudness || -8);
+    const fBpm = normBpm(features.BPM || features.bpm || 120);
+
+    const distances = tracks.map(t => ({
+        track: t,
+        dist: Math.sqrt(
+            Math.pow((t.energy      - fE)  * 1.0,  2) +
+            Math.pow((t.valence     - fV)  * 1.0,  2) +
+            Math.pow((t.dance       - fD)  * 0.85, 2) +
+            Math.pow((t.acousticness- fAc) * 0.70, 2) +
+            Math.pow((t.instrumentalness - fIn) * 0.70, 2) +
+            Math.pow((normLoud(t.loudness) - fLo)  * 0.60, 2) +
+            Math.pow((normBpm(t.bpm)       - fBpm) * 0.45, 2)
+        )
+    }));
+    distances.sort((a,b) => a.dist - b.dist);
+
+    document.getElementById('neighborsLabel').textContent = '// CLOSEST MATCHES IN YOUR INDEX';
+    document.getElementById('neighborGrid').innerHTML = distances.slice(0,8).map(n => {
+        const sc = calcScore(n.track.energy, n.track.valence, n.track.dance, n.track.acousticness, n.track.instrumentalness, n.track.loudness, n.track.bpm);
+        const vc = verdictClass(scoreToVerdict(sc));
+        const tier = getTier(sc);
+        return `
+        <div class="neighbor-card">
+            <div class="neighbor-top">
+                <div class="neighbor-info">
+                    <div class="neighbor-title">${escHtml(n.track.song)}</div>
+                    <div class="neighbor-artist">${escHtml(n.track.artist)} <span class="phase-tag" style="border-color:${tier.color}33;color:${tier.color};font-size:9px">${tier.tier}</span></div>
+                </div>
+                <div class="neighbor-score ${vc}">${sc}%</div>
+            </div>
+            <div class="neighbor-stats">
+                <span>NRG:${n.track.energy}</span>
+                <span>VAL:${n.track.valence}</span>
+                <span>DNC:${n.track.dance}</span>
+                <span>BPM:${n.track.bpm}</span>
+                <span>${n.track.key || '--'}</span>
+                <span>Δ${Math.round(n.dist)}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function runDiscoverSearch() {
+    const q = document.getElementById('discoverSearch').value.trim();
+    if (!q) return;
+
+    const btn = document.getElementById('discoverSearchBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>SCANNING';
+
+    document.getElementById('discoverSearchResults').innerHTML = '<div class="discover-section-title">// SPOTIFY SEARCH RESULTS</div><div class="neighbor-grid" id="searchResultGrid"><div class="empty-state">Scanning Spotify…</div></div>';
+
+    try {
+        const res = await fetch('/api/search_spotify', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({query: q})
+        });
+        const data = await res.json();
+        if (data.error) {
+            showToast(`// SCAN ERROR: ${data.error}`, 'error');
+            document.getElementById('searchResultGrid').innerHTML = `<div class="empty-state">${data.error}</div>`;
+            return;
+        }
+        if (!data.length) {
+            document.getElementById('searchResultGrid').innerHTML = '<div class="empty-state">No results found. Try a different query.</div>';
+            return;
+        }
+        document.getElementById('searchResultGrid').innerHTML = data.map(t => `
+            <div class="neighbor-card search-result" onclick="scoreDiscoverTrack('${t.id}', this)" data-id="${t.id}">
+                <div class="neighbor-top">
+                    ${t.album_art ? `<img class="neighbor-art" src="${escHtml(t.album_art)}" alt="">` : ''}
+                    <div class="neighbor-info">
+                        <div class="neighbor-title">${escHtml(t.name)}</div>
+                        <div class="neighbor-artist">${escHtml(t.artist)}</div>
+                    </div>
+                    <div class="neighbor-score pending" id="ds-score-${t.id}">--</div>
+                </div>
+                <div class="neighbor-stats"><span>${escHtml(t.album)}</span></div>
+                <button class="neighbor-action">⚡ SCAN SIGNAL</button>
+            </div>`
+        ).join('');
+    } catch (err) {
+        showToast('// SEARCH FAILED — server unreachable', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'SCAN ⟶';
+    }
+}
+
+async function scoreDiscoverTrack(trackId, cardEl) {
+    const scoreEl = document.getElementById(`ds-score-${trackId}`);
+    if (scoreEl) {
+        scoreEl.className = 'neighbor-score pending';
+        scoreEl.innerHTML = '<span class="spinner"></span>';
+    }
+    try {
+        const res = await fetch('/api/score_track', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({track_id: trackId})
+        });
+        const data = await res.json();
+        if (data.error) {
+            if (scoreEl) { scoreEl.textContent = 'ERR'; scoreEl.className = 'neighbor-score void-sig'; }
+            showToast(`// ${data.error}`, 'error');
+            return;
+        }
+        const vc = verdictClass(data.verdict);
+        if (scoreEl) { scoreEl.textContent = `${data.score}%`; scoreEl.className = `neighbor-score ${vc}`; }
+        showToast(`// ${data.verdict}: ${data.score}% — ${data.method}`);
+        renderNeighbors(data.features);
+    } catch (err) {
+        if (scoreEl) { scoreEl.textContent = 'ERR'; scoreEl.className = 'neighbor-score void-sig'; }
+        showToast('// SCORE FAILED — API unreachable', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════ SYNC ═══
+
+async function syncMasterPlaylist() {
+    const playlistId = prompt('Enter your Spotify Playlist ID to sync:');
+    if (!playlistId || !playlistId.trim()) return;
+
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>SYNCING…';
+    showToast('// SYNC INITIATED — contacting Spotify…');
+
+    try {
+        const res = await fetch('/api/sync_playlist', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({playlist_id: playlistId.trim()})
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`// ${data.message}`);
+            await loadData();
+        } else {
+            showToast(`// SYNC ERROR: ${data.error}`, 'error');
+        }
+    } catch(e) {
+        showToast('// SYNC FAILED — server unreachable', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⟳ SYNC MASTER DATABASE';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════ SCORER ═══
+
+function toggleAutoAnalyze(el) {
+    autoAnalyzeEnabled = el.checked;
+    if (autoAnalyzeEnabled && currentId) {
+        const h = historyLog.find(x => x.id === currentId);
+        if (h && (h.verdict === 'UNRATED' || h.verdict === 'ERROR')) triggerScore(false);
+    }
+}
+
+async function triggerScore(isManual = true) {
+    if (!currentId) {
+        showToast('// NO TRACK DETECTED — open Spotify and play something', 'warn');
+        return;
+    }
+
+    const targetId  = currentId;
+    const targetObj = currentTrackObj;
+
+    const btn = document.getElementById('analyzeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>ANALYZING';
+
+    if (isManual) showPage('scorer');
+
+    document.getElementById('scoreIdle').style.display = 'none';
+    document.getElementById('scoreResult').style.display = 'block';
+    document.getElementById('bigScore').textContent = '...';
+    document.getElementById('bigScore').className = 'score-num';
+    document.getElementById('verdictLabel').textContent = '';
+    document.getElementById('methodLabel').textContent = '';
+    document.getElementById('compareBox').style.display = 'none';
+    document.getElementById('scorerArtWrap').style.display = 'none';
+
+    try {
+        const res = await fetch('/api/score_track', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({track_id: targetId})
+        });
+        const data = await res.json();
+
+        const histItem = historyLog.find(h => h.id === targetId);
+        if (histItem) {
+            histItem.score   = data.error ? null : data.score;
+            histItem.method  = data.error ? data.error : data.method;
+            histItem.verdict = data.error ? 'ERROR' : data.verdict;
+            renderHistory();
+        }
+
+        if (targetId !== currentId) return;
+
+        if (data.error) {
+            document.getElementById('bigScore').textContent = 'ERR';
+            document.getElementById('bigScore').className = 'score-num void-sig';
+            document.getElementById('verdictLabel').textContent = 'NO MATCH';
+            document.getElementById('verdictLabel').className = 'verdict void-sig';
+            document.getElementById('methodLabel').textContent = `// ${data.error}`;
+            showToast(`// ${data.error}`, 'error');
+            return;
+        }
+
+        const vc = verdictClass(data.verdict);
+        document.getElementById('bigScore').textContent  = data.score + '%';
+        document.getElementById('bigScore').className    = 'score-num ' + vc;
+        document.getElementById('verdictLabel').textContent = data.verdict;
+        document.getElementById('verdictLabel').className   = 'verdict ' + vc;
+        const methodSuffix = data.camelot && data.camelot !== '--' ? ` · KEY ${data.camelot}` : '';
+        const ghostBadge   = data.source === 'ghost_decrypted'
+            ? ' <span style="color:var(--bankai);font-size:10px">⚡ LOCAL ANALYSIS</span>' : '';
+        document.getElementById('methodLabel').innerHTML = `// ${data.method}${methodSuffix}${ghostBadge}`;
+
+        // Album art in scorer sidebar
+        if (targetObj) {
+            document.getElementById('scorerArt').src = targetObj.album_art || '';
+            document.getElementById('scorerTrack').textContent  = targetObj.name;
+            document.getElementById('scorerArtist').textContent = targetObj.artist;
+            document.getElementById('scorerArtWrap').style.display = 'block';
+        }
+
+        // Single 7-box feature row
+        const f = data.features;
+        const d = data.deltas;
+        document.getElementById('featuresRow').innerHTML = `
+            <div class="feat-box">
+                <div class="feat-label">ENERGY</div>
+                <div class="feat-val">${f.Energy}%</div>
+                <div class="feat-delta ${deltaClass(d.Energy)}">Δ${d.Energy}</div>
+            </div>
+            <div class="feat-box">
+                <div class="feat-label">VALENCE</div>
+                <div class="feat-val">${f.Valence}%</div>
+                <div class="feat-delta ${deltaClass(d.Valence)}">Δ${d.Valence}</div>
+            </div>
+            <div class="feat-box">
+                <div class="feat-label">DANCE</div>
+                <div class="feat-val">${f.Dance}%</div>
+                <div class="feat-delta ${deltaClass(d.Dance)}">Δ${d.Dance}</div>
+            </div>
+            <div class="feat-box">
+                <div class="feat-label">LOUDNESS</div>
+                <div class="feat-val">${f.Loudness}<span style="font-size:11px">dB</span></div>
+                <div class="feat-delta ${deltaClass(d.Loudness)}">Δ${d.Loudness}</div>
+            </div>
+            <div class="feat-box">
+                <div class="feat-label">BPM</div>
+                <div class="feat-val">${f.BPM}</div>
+                <div class="feat-delta ${deltaClass(d.BPM, 10, 20)}">Δ${d.BPM}</div>
+            </div>
+            <div class="feat-box" style="${f.Acoustic < 2 ? 'opacity:0.4' : ''}">
+                <div class="feat-label">ACOUSTIC</div>
+                <div class="feat-val">${f.Acoustic}%</div>
+                <div class="feat-delta ${deltaClass(d.Acoustic)}">
+                    ${f.Acoustic < 2 ? '<span style="font-size:9px;color:var(--dim)">EXCLUDED</span>' : 'Δ'+d.Acoustic}
+                </div>
+            </div>
+            <div class="feat-box" style="${f.Instrumental < 2 ? 'opacity:0.4' : ''}">
+                <div class="feat-label">INSTR.</div>
+                <div class="feat-val">${f.Instrumental}%</div>
+                <div class="feat-delta ${deltaClass(d.Instrumental)}">
+                    ${f.Instrumental < 2 ? '<span style="font-size:9px;color:var(--dim)">EXCLUDED</span>' : 'Δ'+d.Instrumental}
+                </div>
+            </div>
+        `;
+
+        // 7-axis scorer radar
+        const p = data.profile;
+        const normLoudR = db => Math.max(0, Math.min(1, ((db + 30) / 30)));
+        const normBpmR  = v  => Math.min(1, v / 200);
+        const profileVals = [
+            (p.energy||0)/100, (p.valence||0)/100, (p.dance||0)/100,
+            normLoudR(p.loudness||0), normBpmR(p.bpm||0),
+            (p.acousticness||0)/100,  (p.instrumentalness||0)/100
+        ];
+        const trackVals = [
+            (f.Energy||0)/100, (f.Valence||0)/100, (f.Dance||0)/100,
+            normLoudR(f.Loudness||0), normBpmR(f.BPM||0),
+            (f.Acoustic||0)/100,      (f.Instrumental||0)/100
+        ];
+        buildScorerRadar(profileVals, trackVals);
+
+        // 7-metric compare bars
+        document.getElementById('compareBox').style.display = 'block';
+
+        const normLoud = db => Math.max(0, Math.min(100, ((db + 30) / 30) * 100));
+        const normBpm  = bpm => Math.min(100, (bpm / 200) * 100);
+
+        const compareDefs = [
+            ['Energy',       'cEnergy',       'cpEnergy',       'ctEnergy',       f.Energy,              p.energy,                      d.Energy      ],
+            ['Valence',      'cValence',       'cpValence',      'ctValence',      f.Valence,             p.valence,                     d.Valence     ],
+            ['Dance',        'cDance',         'cpDance',        'ctDance',        f.Dance,               p.dance,                       d.Dance       ],
+            ['Acoustic',     'cAcoustic',      'cpAcoustic',     'ctAcoustic',     f.Acoustic,            p.acousticness,                d.Acoustic    ],
+            ['Instrumental', 'cInstrumental',  'cpInstrumental', 'ctInstrumental', f.Instrumental,        p.instrumentalness,            d.Instrumental],
+            ['Loudness',     'cLoudness',      'cpLoudness',     'ctLoudness',     normLoud(f.Loudness),  normLoud(p.loudness),          d.Loudness    ],
+            ['BPM',          'cBpm',           'cpBpm',          'ctBpm',          normBpm(f.BPM),        normBpm(p.bpm),                d.BPM         ],
+        ];
+
+        const rawVals = {
+            'cEnergy': f.Energy + '%', 'cValence': f.Valence + '%', 'cDance': f.Dance + '%',
+            'cAcoustic': f.Acoustic + '%', 'cInstrumental': f.Instrumental + '%',
+            'cLoudness': f.Loudness + 'dB', 'cBpm': f.BPM
+        };
+
+        compareDefs.forEach(([,cId,cpId,ctId,tVal,pVal,diff]) => {
+            document.getElementById(cId).textContent = rawVals[cId];
+            document.getElementById(cpId).style.width = pVal + '%';
+            const bar = document.getElementById(ctId);
+            bar.style.width = tVal + '%';
+            bar.className = 'compare-track-bar ' + barClass(diff);
+        });
+
+        // Update live feed art score overlay
+        const artScore = document.getElementById('npArtScore');
+        artScore.textContent = data.score + '%';
+        artScore.style.color = vc === 'resonance' ? 'var(--resonance)' :
+                               vc === 'locked'    ? 'var(--neon)'      :
+                               vc === 'adjacent'  ? 'var(--quincy)'    :
+                               vc === 'peripheral'? 'var(--chrome)'    :
+                               vc === 'clash'     ? 'var(--clash)'     : 'var(--bankai)';
+        artScore.style.display = 'block';
+
+        lastAnalyzedFeatures = f;
+        renderNeighbors(f);
+
+        // Auto-add #2 (smart): fires if score meets threshold
+        maybeAutoAdd(targetId, data.score, targetObj ? targetObj.name : targetId);
+        updateSparkline();
+
+        showToast(`// ${data.verdict}: ${data.score}% — ${data.method}`);
+
+    } catch(err) {
+        console.error('triggerScore error:', err);
+        const histItem = historyLog.find(h => h.id === targetId);
+        if (histItem) { histItem.verdict = 'ERROR'; histItem.method = 'API UNREACHABLE'; renderHistory(); }
+        if (targetId === currentId) {
+            document.getElementById('bigScore').textContent = 'FAIL';
+            document.getElementById('bigScore').className = 'score-num void-sig';
+            document.getElementById('methodLabel').textContent = '// API UNREACHABLE';
+        }
+        showToast('// SCORE FAILED — server unreachable', 'error');
+    } finally {
+        if (targetId === currentId) {
+            btn.disabled = false;
+            btn.textContent = 'RE-ANALYZE TRACK';
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════ SSE / LIVE FEED ═══
+
+function handleNowPlaying(data) {
+    if (data.is_playing) {
+        currentTrackObj = data;
+        document.getElementById('liveModule').style.display = 'block';
+
+        // Update playback state for transport UI
+        isPlaying = true;
+        currentDuration = data.duration_ms || 0;
+        if (!seekDragging) {
+            currentProgress = data.progress_ms || 0;
+            updateSeekUI(currentProgress, currentDuration);
+        }
+        updatePlayPauseBtn(true);
+
+        if (currentId !== data.id) {
+            currentId = data.id;
+            document.getElementById('npName').textContent   = data.name;
+            document.getElementById('npArtist').textContent = data.artist;
+
+            if (data.album_art) {
+                const artWrap = document.getElementById('npArtWrap');
+                const artImg  = document.getElementById('npArt');
+                artImg.src = data.album_art;
+                artWrap.style.display = 'block';
+            }
+
+            document.getElementById('npArtScore').style.display = 'none';
+
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = false;
+            btn.textContent = 'ANALYZE TRACK';
+
+            document.getElementById('scoreIdle').style.display = 'block';
+            document.getElementById('scoreResult').style.display = 'none';
+            document.getElementById('compareBox').style.display = 'none';
+            document.getElementById('scorerArtWrap').style.display = 'none';
+
+            historyLog.unshift({
+                id:      currentId,
+                name:    data.name,
+                artist:  data.artist,
+                score:   null,
+                method:  'AWAITING SCAN…',
+                verdict: 'UNRATED',
+                time:    Date.now()
+            });
+            if (historyLog.length > 50) historyLog.pop();
+            renderHistory();
+
+            if (autoAnalyzeEnabled) setTimeout(() => triggerScore(false), 2000);
+        }
+
+        // Start local progress ticker so bar moves smoothly between SSE events
+        startProgressTicker();
+    } else {
+        isPlaying = false;
+        updatePlayPauseBtn(false);
+        stopProgressTicker();
+    }
+}
+
+function startProgressTicker() {
+    stopProgressTicker();
+    progressTicker = setInterval(() => {
+        if (seekDragging || !isPlaying) return;
+        currentProgress += 1000;
+        if (currentProgress > currentDuration) currentProgress = currentDuration;
+        updateSeekUI(currentProgress, currentDuration);
+    }, 1000);
+}
+
+function stopProgressTicker() {
+    if (progressTicker) { clearInterval(progressTicker); progressTicker = null; }
+}
+
+function updateSeekUI(progressMs, durationMs) {
+    if (!durationMs) return;
+    const pct = Math.min(100, (progressMs / durationMs) * 100);
+    document.getElementById('seekFill').style.width  = pct + '%';
+    document.getElementById('seekThumb').style.left  = pct + '%';
+    document.getElementById('progressCurrent').textContent = fmtMs(progressMs);
+    document.getElementById('progressTotal').textContent   = fmtMs(durationMs);
+}
+
+function updatePlayPauseBtn(playing) {
+    const btn = document.getElementById('playPauseBtn');
+    if (!btn) return;
+    const wrap = btn.querySelector('.t-icon-wrap');
+    if (wrap) {
+        wrap.dataset.icon = playing ? 'pause' : 'play';
+        setTransportIcon('playPauseBtn', playing ? 'pause' : 'play');
+    } else {
+        btn.textContent = playing ? '⏸' : '▶';
+    }
+}
+
+function startSSE() {
+    if (sseSource) { sseSource.close(); sseSource = null; }
+
+    sseSource = new EventSource('/api/stream');
+
+    sseSource.addEventListener('now_playing', e => {
+        try {
+            const data = JSON.parse(e.data);
+            handleNowPlaying(data);
+        } catch(err) { console.warn('[SSE] parse error', err); }
+    });
+
+    // Ghost Signal Decryption — live status ticker
+    sseSource.addEventListener('ghost_status', e => {
+        try {
+            const { message } = JSON.parse(e.data);
+            showGhostStatusBanner(message, 'ghost');
+        } catch(err) {}
+    });
+
+    // Reccobeats offline / system warnings
+    sseSource.addEventListener('system_warning', e => {
+        try {
+            const { message } = JSON.parse(e.data);
+            showGhostStatusBanner(message, 'warning');
+        } catch(err) {}
+    });
+
+    sseSource.onerror = () => {
+        // SSE disconnected — retry after 5s with HTTP fallback
+        sseSource.close(); sseSource = null;
+        console.warn('[SSE] disconnected, retrying in 5s');
+        setTimeout(startSSE, 5000);
+    };
+}
+
+// ── GHOST / SYSTEM STATUS BANNER ─────────────────────────────────
+let _ghostBannerTimer = null;
+function showGhostStatusBanner(msg, type = 'ghost') {
+    let banner = document.getElementById('ghostStatusBanner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'ghostStatusBanner';
+        banner.style.cssText = `
+            position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+            background:rgba(4,8,15,0.97); border:1px solid;
+            padding:8px 18px; border-radius:3px; z-index:9999;
+            font-family:'Share Tech Mono'; font-size:11px; letter-spacing:1px;
+            pointer-events:none; transition:opacity 0.3s;
+            max-width:520px; text-align:center;
+        `;
+        document.body.appendChild(banner);
+    }
+    const color = type === 'warning' ? 'var(--bankai)' : 'var(--neon)';
+    banner.style.borderColor = color;
+    banner.style.color = color;
+    banner.style.opacity = '1';
+    banner.textContent = `// ${msg}`;
+    clearTimeout(_ghostBannerTimer);
+    _ghostBannerTimer = setTimeout(() => { banner.style.opacity = '0'; }, 6000);
+}
+
+// HTTP fallback poll (used only if SSE never connects)
+async function poll() {
+    try {
+        const res  = await fetch('/api/now_playing');
+        const data = await res.json();
+        handleNowPlaying(data);
+    } catch(e) { /* silent fail */ }
+    finally {
+        clearTimeout(pollTimer);
+        pollTimer = setTimeout(poll, 4000);
+    }
+}
+
+// ═══════════════════════════════════════════════════════ TRANSPORT DECK ═══
+
+async function sendPlayback(action, body = {}) {
+    try {
+        await fetch(`/api/playback/${action}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+    } catch(e) { showToast('// TRANSPORT ERROR — server unreachable', 'error'); }
+}
+
+async function togglePlayPause() {
+    if (isPlaying) {
+        await sendPlayback('pause');
+        isPlaying = false;
+        updatePlayPauseBtn(false);
+        stopProgressTicker();
+    } else {
+        await sendPlayback('play');
+        isPlaying = true;
+        updatePlayPauseBtn(true);
+        startProgressTicker();
+    }
+}
+
+async function toggleShuffle() {
+    shuffleState = !shuffleState;
+    await sendPlayback('shuffle', { state: shuffleState });
+    const btn = document.getElementById('shuffleBtn');
+    if (btn) btn.classList.toggle('active-state', shuffleState);
+}
+
+async function cycleRepeat() {
+    const states = ['off', 'context', 'track'];
+    const idx    = states.indexOf(repeatState);
+    repeatState  = states[(idx + 1) % states.length];
+    await sendPlayback('repeat', { state: repeatState });
+    const btn = document.getElementById('repeatBtn');
+    if (!btn) return;
+    btn.classList.remove('active-state', 'repeat-track');
+    if (repeatState === 'context') {
+        btn.classList.add('active-state');
+        setTransportIcon('repeatBtn', 'repeat');
+    } else if (repeatState === 'track') {
+        btn.classList.add('repeat-track');
+        setTransportIcon('repeatBtn', 'repeat1');
+    } else {
+        setTransportIcon('repeatBtn', 'repeat');
+    }
+}
+
+async function setVolume(val) {
+    document.getElementById('volLabel').textContent = val + '%';
+    await sendPlayback('volume', { volume_percent: parseInt(val) });
+}
+
+// Seek bar interaction
+let seekTimeout = null;
+function seekStart(e) {
+    seekDragging = true;
+    seekUpdate(e);
+    const onMove = ev => seekUpdate(ev);
+    const onUp   = ev => {
+        seekUpdate(ev);
+        seekDragging = false;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        // Commit the seek
+        clearTimeout(seekTimeout);
+        seekTimeout = setTimeout(() => {
+            sendPlayback('seek', { position_ms: Math.floor(currentProgress) });
+        }, 80);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
+
+function seekUpdate(e) {
+    const wrap = document.getElementById('seekWrap');
+    if (!wrap || !currentDuration) return;
+    const rect = wrap.getBoundingClientRect();
+    const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    currentProgress = pct * currentDuration;
+    updateSeekUI(currentProgress, currentDuration);
+}
+
+// Device switcher
+async function refreshDevices() {
+    try {
+        const res     = await fetch('/api/devices');
+        const devices = await res.json();
+        const sel     = document.getElementById('deviceSelect');
+        if (!sel) return;
+        sel.innerHTML = '';
+        if (!devices.length) {
+            sel.innerHTML = '<option value="">— no devices found —</option>';
+            return;
+        }
+        devices.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.id;
+            opt.textContent = `${d.is_active ? '▶ ' : ''}${d.name} [${d.type}]`;
+            opt.selected = d.is_active;
+            sel.appendChild(opt);
+        });
+    } catch(e) { console.warn('[devices]', e); }
+}
+
+async function switchDevice(deviceId) {
+    if (!deviceId) return;
+    try {
+        const res  = await fetch('/api/transfer_playback', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: deviceId })
+        });
+        const data = await res.json();
+        if (data.success) showToast('// PLAYBACK TRANSFERRED');
+        else showToast('// TRANSFER FAILED', 'error');
+    } catch(e) { showToast('// TRANSFER ERROR', 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════ SPARKLINE ═══
+
+function updateSparkline() {
+    const scored = historyLog.filter(h => h.score !== null).slice(0, 20).reverse();
+    if (scored.length < 2) return;
+    const pts = scored.map((h, i) => {
+        const x = (i / (scored.length - 1)) * 200;
+        const y = 30 - (h.score / 100) * 28;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    document.getElementById('sparklineLine').setAttribute('points', pts);
+    // reference line at centroid score level (75%)
+    const refY = (30 - 0.75 * 28).toFixed(1);
+    document.getElementById('sparklineRef').setAttribute('y1', refY);
+    document.getElementById('sparklineRef').setAttribute('y2', refY);
+}
+
+// ═══════════════════════════════════════════════════ PLAYLIST PRESET ═══
+// ═══════════════════════════════════════════════════ PRESET MANAGER ═══
+
+const PRESET_DEFAULT = [
+    { name: '◈ TRACK VAULT', id: '1rxvJh0wWgia4ylocdC42Y', locked: true }
+];
+
+function loadPresets() {
+    try {
+        const raw = localStorage.getItem('ventus_playlist_presets');
+        return raw ? JSON.parse(raw) : [...PRESET_DEFAULT];
+    } catch { return [...PRESET_DEFAULT]; }
+}
+
+function savePresets(presets) {
+    localStorage.setItem('ventus_playlist_presets', JSON.stringify(presets));
+}
+
+function rebuildPresetSelect() {
+    const sel    = document.getElementById('autoAddPlaylistPreset');
+    const curVal = sel.value;
+    const presets = loadPresets();
+    sel.innerHTML = '';
+    presets.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+    });
+    // Custom entry last
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = '✎ Custom playlist ID…';
+    sel.appendChild(customOpt);
+    // Restore selection if still valid
+    if ([...sel.options].some(o => o.value === curVal)) sel.value = curVal;
+    else { sel.selectedIndex = 0; handlePlaylistPreset(sel); }
+}
+
+function handlePlaylistPreset(sel) {
+    const customInput = document.getElementById('autoAddPlaylistId');
+    if (sel.value === 'custom') {
+        customInput.style.display = 'block';
+        customInput.value = '';
+        customInput.focus();
+    } else {
+        customInput.style.display = 'none';
+        customInput.value = sel.value;
+    }
+}
+
+function openPresetManager() {
+    document.getElementById('presetManagerOverlay').style.display = 'flex';
+    renderPresetList();
+}
+
+function closePresetManager() {
+    document.getElementById('presetManagerOverlay').style.display = 'none';
+    document.getElementById('newPresetName').value = '';
+    document.getElementById('newPresetId').value = '';
+}
+
+function renderPresetList() {
+    const presets = loadPresets();
+    const el = document.getElementById('presetList');
+    if (!presets.length) {
+        el.innerHTML = '<div style="font-family:\'Share Tech Mono\';font-size:10px;color:var(--dim);text-align:center;padding:20px 0">No presets saved yet.</div>';
+        return;
+    }
+    el.innerHTML = presets.map((p, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1;min-width:0">
+                <div style="font-family:'Share Tech Mono';font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+                <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.id}</div>
+            </div>
+            ${p.locked ? `<span style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);padding:3px 7px;border:1px solid var(--border);border-radius:2px">DEFAULT</span>` : `
+            <button onclick="editPreset(${i})" title="Rename"
+                style="background:none;border:1px solid var(--border2);color:var(--quincy);font-size:11px;cursor:pointer;padding:3px 7px;border-radius:2px;font-family:'Share Tech Mono';transition:background 0.1s"
+                onmouseover="this.style.background='var(--panel3)'" onmouseout="this.style.background='none'">✎</button>
+            <button onclick="deletePreset(${i})" title="Delete"
+                style="background:none;border:1px solid rgba(255,76,43,0.3);color:var(--bankai);font-size:11px;cursor:pointer;padding:3px 7px;border-radius:2px;font-family:'Share Tech Mono';transition:background 0.1s"
+                onmouseover="this.style.background='rgba(255,76,43,0.12)'" onmouseout="this.style.background='none'">✕</button>`}
+        </div>`).join('');
+}
+
+function addPreset() {
+    const name = document.getElementById('newPresetName').value.trim().toUpperCase();
+    const id   = document.getElementById('newPresetId').value.trim();
+    if (!name || !id) { showToast('// Enter both a name and playlist ID', 'warn'); return; }
+    const presets = loadPresets();
+    presets.push({ name: `◈ ${name}`, id });
+    savePresets(presets);
+    renderPresetList();
+    rebuildPresetSelect();
+    document.getElementById('newPresetName').value = '';
+    document.getElementById('newPresetId').value = '';
+    showToast(`// PRESET SAVED — ${name}`, 'ok');
+}
+
+function deletePreset(i) {
+    const presets = loadPresets();
+    if (presets[i].locked) return;
+    const name = presets[i].name;
+    presets.splice(i, 1);
+    savePresets(presets);
+    renderPresetList();
+    rebuildPresetSelect();
+    showToast(`// PRESET REMOVED — ${name}`);
+}
+
+function editPreset(i) {
+    const presets = loadPresets();
+    const p = presets[i];
+    const newName = prompt('Rename preset:', p.name.replace(/^◈\s*/, ''));
+    if (!newName || !newName.trim()) return;
+    presets[i].name = `◈ ${newName.trim().toUpperCase()}`;
+    savePresets(presets);
+    renderPresetList();
+    rebuildPresetSelect();
+}
+
+// Close modal on overlay click
+document.addEventListener('DOMContentLoaded', () => {
+    rebuildPresetSelect();
+    const overlay = document.getElementById('presetManagerOverlay');
+    overlay.addEventListener('click', e => { if (e.target === overlay) closePresetManager(); });
+    // ESC to close
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.style.display === 'flex') closePresetManager(); });
+});
+
+// ═══════════════════════════════════════════════════════ AUTO-ADD ═══
+
+async function maybeAutoAdd(trackId, score, trackName) {
+    const toggle = document.getElementById('autoAddToggle');
+    if (!toggle || !toggle.checked) return;
+    const thresh = parseInt(document.getElementById('autoAddThresh').value || '75');
+    const pid    = (document.getElementById('autoAddPlaylistId').value || '').trim();
+    if (!pid) {
+        showToast('// AUTO-ADD: no target playlist ID set', 'warn');
+        return;
+    }
+    if (score < thresh) return;
+    try {
+        const res = await fetch('/api/add_to_playlist', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({playlist_id: pid, track_id: trackId})
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`// AUTO-ADD ✓ — "${trackName}" → playlist (${score}%)`, 'ok');
+        } else {
+            showToast(`// AUTO-ADD FAILED: ${data.error}`, 'error');
+        }
+    } catch(e) {
+        showToast('// AUTO-ADD ERROR — server unreachable', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════ VAULT SYNC ═══
+// Auto-adder #1: syncs your playlist tracks into the vault
+
+async function syncVaultFromPlaylist() {
+    const pid = prompt('Enter Spotify Playlist ID to sync into vault:');
+    if (!pid || !pid.trim()) return;
+    const btn = document.getElementById('vaultSyncBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>SYNCING VAULT…';
+    showToast('// VAULT SYNC — fetching playlist from Spotify…');
+    try {
+        const res = await fetch('/api/sync_vault_from_playlist', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({playlist_id: pid.trim()})
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`// ${data.message}`);
+            await loadData();
+        } else {
+            showToast(`// VAULT SYNC ERROR: ${data.error}`, 'error');
+        }
+    } catch(e) {
+        showToast('// VAULT SYNC FAILED — server unreachable', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '◈ SYNC VAULT FROM PLAYLIST';
+    }
+}
+
+// ═══════════════════════════════════════════════════ EXPORT SESSION ═══
+
+async function exportSessionLog() {
+    if (!historyLog.length) {
+        showToast('// SESSION LOG EMPTY — nothing to export', 'warn');
+        return;
+    }
+    try {
+        const res = await fetch('/api/export_session', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(historyLog)
+        });
+        if (!res.ok) throw new Error('export failed');
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url; a.download = `ventus_session_${Date.now()}.csv`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('// SESSION LOG EXPORTED');
+    } catch(e) {
+        showToast('// EXPORT FAILED', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════ REFRESH GENRES ═══
+
+async function rebuildDna() {
+    const btn = document.getElementById('rebuildDnaBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>REBUILDING…';
+    showToast('// DNA REBUILD — scanning Last.fm tags… (this takes ~30s)');
+    try {
+        const res  = await fetch('/api/rebuild_dna', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        const data = await res.json();
+        if (data.success) {
+            showToast(`// ${data.message}`);
+            // Re-render DNA tags immediately
+            const grid = document.getElementById('dnaGrid');
+            if (data.dna && data.dna.length) {
+                grid.innerHTML = data.dna.map(tag => `<div class="dna-tag">${tag}</div>`).join('');
+            }
+        } else {
+            showToast(`// DNA REBUILD FAILED: ${data.error}`, 'error');
+        }
+    } catch(e) {
+        showToast('// DNA REBUILD ERROR — server unreachable', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⟳ REFRESH GENRES';
+    }
+}
+
+// ═══════════════════════════════════════════════════ PLAYLIST AUDIT ═══
+
+async function runPlaylistAudit() {
+    const pid = document.getElementById('auditPlaylistId').value.trim();
+    if (!pid) { showToast('// Enter a playlist ID first', 'warn'); return; }
+
+    const btn = document.getElementById('auditBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>AUDITING';
+    document.getElementById('auditSummary').style.display = 'none';
+    document.getElementById('auditList').innerHTML = '<div class="empty-state">// SCANNING EVERY TRACK — this may take a moment…</div>';
+
+    try {
+        const res  = await fetch('/api/audit_playlist', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({playlist_id: pid})
+        });
+        const data = await res.json();
+        if (data.error) { showToast(`// AUDIT ERROR: ${data.error}`, 'error'); return; }
+
+        const scored = data.filter(t => t.score !== null);
+        const counts = {
+            'PERFECT MATCH': 0, 'STRONG MATCH': 0, 'ALIGNED': 0,
+            'PERIPHERAL': 0, 'DISSONANT': 0, 'NO MATCH': 0, 'GHOST': 0
+        };
+        data.forEach(t => { if (counts[t.verdict] !== undefined) counts[t.verdict]++; });
+
+        const avgScore = scored.length ? Math.round(scored.reduce((a,b)=>a+b.score,0)/scored.length) : 0;
+        const topHits  = scored.filter(t => t.score >= 75).length;
+
+        document.getElementById('auditKpis').innerHTML = `
+            <div class="kpi"><div class="kpi-label">TOTAL TRACKS</div><div class="kpi-val">${data.length}</div></div>
+            <div class="kpi"><div class="kpi-label">AVG SCORE</div><div class="kpi-val chrome">${avgScore}%</div></div>
+            <div class="kpi"><div class="kpi-label">STRONG MATCH+</div><div class="kpi-val cyan">${topHits}</div></div>
+            <div class="kpi"><div class="kpi-label">RESONANCE</div><div class="kpi-val gold">${counts['PERFECT MATCH']}</div></div>
+            <div class="kpi"><div class="kpi-label">GHOSTS</div><div class="kpi-val red">${counts['GHOST']}</div></div>
+            <div class="kpi"><div class="kpi-label">COVERAGE</div><div class="kpi-val">${data.length ? Math.round((scored.length/data.length)*100) : 0}%</div></div>
+        `;
+
+        // Distribution bar
+        const verdictMeta = [
+            ['PERFECT MATCH', 'var(--resonance)'],
+            ['STRONG MATCH',    'var(--neon)'],
+            ['ALIGNED', 'var(--quincy)'],
+            ['PERIPHERAL',     'var(--chrome)'],
+            ['DISSONANT','var(--clash)'],
+            ['NO MATCH',    'var(--bankai)'],
+            ['GHOST',          'var(--dim)'],
+        ];
+        const total = data.length || 1;
+        document.getElementById('auditDistBar').innerHTML =
+            `<div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:1px;width:100%;margin-bottom:4px;">// VERDICT DISTRIBUTION</div>` +
+            `<div style="display:flex;width:100%;height:8px;border-radius:4px;overflow:hidden;gap:1px">` +
+            verdictMeta.map(([v, color]) => {
+                const pct = (counts[v] / total * 100).toFixed(1);
+                return counts[v] > 0 ? `<div class="audit-dist-seg" style="width:${pct}%;background:${color}" data-label="${v}: ${counts[v]} (${pct}%)"></div>` : '';
+            }).join('') + `</div>` +
+            verdictMeta.filter(([v]) => counts[v] > 0).map(([v, color]) =>
+                `<div style="font-family:'Share Tech Mono';font-size:9px;color:${color};white-space:nowrap"><span style="display:inline-block;width:6px;height:6px;background:${color};border-radius:50%;margin-right:4px"></span>${v}: ${counts[v]}</div>`
+            ).join('');
+
+        document.getElementById('auditSummary').style.display = 'block';
+
+        data.sort((a,b) => (b.score||0) - (a.score||0));
+        document.getElementById('auditList').innerHTML = data.map((t, i) => {
+            const vc = t.verdict === 'GHOST' ? 'void-sig' : verdictClass(t.verdict);
+            return `
+            <div class="list-item" style="grid-template-columns:48px 1fr 96px 130px 68px 68px 92px">
+                <div class="col-num">${i+1}</div>
+                <div class="col-info">
+                    <div class="col-name">${escHtml(t.name)}</div>
+                    <div class="col-sub">${escHtml(t.artist)}</div>
+                </div>
+                <div class="col-key">${t.camelot || '--'}</div>
+                <div class="col-stat ${vc}" style="font-family:'Share Tech Mono';font-size:10px;font-weight:bold">${t.verdict}</div>
+                <div class="col-stat">${t.features ? Math.round(t.features.energy)+'%' : '--'}</div>
+                <div class="col-stat">${t.features ? Math.round(t.features.valence)+'%' : '--'}</div>
+                <div class="col-score ${vc}">${t.score !== null ? t.score+'%' : 'GHOST'}</div>
+            </div>`;
+        }).join('');
+
+        showToast(`// AUDIT COMPLETE — ${data.length} tracks scanned, avg ${avgScore}%`);
+    } catch(e) {
+        showToast('// AUDIT FAILED — server unreachable', 'error');
+        document.getElementById('auditList').innerHTML = '<div class="empty-state">Audit failed. Check Flask server.</div>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'AUDIT ⟶';
+    }
+}
+
+// ═══════════════════════════════════════════════════ QUEUE ANALYZER ═══
+
+async function loadQueue() {
+    const listEl  = document.getElementById('queueList');
+    const statusEl = document.getElementById('queueStatus');
+    const badge   = document.getElementById('queueBadge');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span> Fetching queue from Spotify…</div>';
+    if (statusEl) statusEl.textContent = '';
+
+    try {
+        const res  = await fetch('/api/queue');
+        if (!res.ok) {
+            listEl.innerHTML = '<div class="empty-state">No active Spotify player. Start playing something first.</div>';
+            return;
+        }
+        const data = await res.json();
+        if (data.error) {
+            listEl.innerHTML = `<div class="empty-state">${escHtml(data.error)}</div>`;
+            return;
+        }
+        if (!data.length) {
+            listEl.innerHTML = '<div class="empty-state">Queue is empty.</div>';
+            return;
+        }
+
+        if (badge) { badge.textContent = data.length; badge.style.display = 'block'; }
+        if (statusEl) statusEl.textContent = `// ${data.length} TRACKS SCORED`;
+
+        listEl.innerHTML = data.map((t, i) => {
+            const vc     = t.score !== null ? verdictClass(t.verdict) : 'unrated';
+            const tier   = t.score !== null ? getTier(t.score) : null;
+            return `
+            <div class="list-item" style="grid-template-columns:44px 1fr 96px 68px 68px 100px 100px">
+                <div class="col-num">${i + 1}</div>
+                <div class="col-info">
+                    <div class="col-name">${escHtml(t.name)}</div>
+                    <div class="col-sub">${escHtml(t.artist)}
+                        ${tier ? `<span class="phase-tag" style="border-color:${tier.color}33;color:${tier.color}">${tier.tier}</span>` : ''}
+                    </div>
+                </div>
+                <div class="col-key">${t.camelot || '--'}</div>
+                <div class="col-stat" style="color:var(--quincy);font-size:13px">${t.energy !== null && t.energy !== undefined ? t.energy+'%' : '—'}</div>
+                <div class="col-stat" style="color:var(--chrome);font-size:13px">${t.valence !== null && t.valence !== undefined ? t.valence+'%' : '—'}</div>
+                <div class="col-stat ${vc}" style="font-family:'Share Tech Mono';font-size:10px;font-weight:bold">${escHtml(t.verdict)}</div>
+                <div class="col-score ${vc}">${t.score !== null ? t.score + '%' : '--'}</div>
+            </div>`;
+        }).join('');
+
+    } catch(e) {
+        listEl.innerHTML = '<div class="empty-state">Failed to fetch queue. Check Flask server.</div>';
+    }
+}
+
+
+// ════════════════════════════════════════════════ SIGNALS PAGE ════
+let signalsRange   = 'short_term';
+let signalsLoaded  = false;
+
+async function loadSignals(forceRange) {
+    const range = forceRange || signalsRange;
+    const statusEl = document.getElementById('signalsStatus');
+    const tracksEl = document.getElementById('signalsTracksList');
+    const artistsEl = document.getElementById('signalsArtistsList');
+    if (!tracksEl || !artistsEl) return;
+
+    if (statusEl) statusEl.textContent = '// FETCHING...';
+    tracksEl.innerHTML  = '<div class="empty-state"><span class="spinner"></span> Loading top tracks…</div>';
+    artistsEl.innerHTML = '<div class="empty-state"><span class="spinner"></span> Loading top artists…</div>';
+
+    try {
+        const [tracksRes, artistsRes] = await Promise.all([
+            fetch(`/api/top?type=tracks&time_range=${range}&limit=50`),
+            fetch(`/api/top?type=artists&time_range=${range}&limit=50`)
+        ]);
+
+        if (!tracksRes.ok || !artistsRes.ok) {
+            tracksEl.innerHTML  = '<div class="empty-state">Failed to fetch. Check Flask server.</div>';
+            artistsEl.innerHTML = '<div class="empty-state">Failed to fetch. Check Flask server.</div>';
+            if (statusEl) statusEl.textContent = '';
+            return;
+        }
+
+        const tracks  = await tracksRes.json();
+        const artists = await artistsRes.json();
+
+        if (tracks.error)  { tracksEl.innerHTML  = `<div class="empty-state">${escHtml(tracks.error)}</div>`;  }
+        else { tracksEl.innerHTML  = renderSignalsTracks(tracks);  }
+
+        if (artists.error) { artistsEl.innerHTML = `<div class="empty-state">${escHtml(artists.error)}</div>`; }
+        else { artistsEl.innerHTML = renderSignalsArtists(artists); }
+
+        const rangeLabel = { short_term: 'LAST 4 WEEKS', medium_term: 'LAST 6 MONTHS', long_term: 'ALL TIME' };
+        if (statusEl) statusEl.textContent = `// ${rangeLabel[range] || range}`;
+        signalsLoaded = true;
+    } catch(e) {
+        tracksEl.innerHTML  = '<div class="empty-state">Error loading signals.</div>';
+        artistsEl.innerHTML = '<div class="empty-state">Error loading signals.</div>';
+        console.warn('[SIGNALS]', e);
+    }
+}
+
+function renderSignalsTracks(tracks) {
+    if (!tracks.length) return '<div class="empty-state">No data for this time range.</div>';
+    return tracks.map((t, i) => {
+        const art     = t.album_art ? `<img class="signals-art" src="${escHtml(t.album_art)}" alt="" loading="lazy">` : '<div class="signals-art-placeholder">♪</div>';
+        const artist  = escHtml((t.artists || []).map(a => a.name).join(', '));
+        const rankCol = i < 3 ? 'var(--quincy)' : 'var(--dim)';
+        const durMs   = t.duration_ms || 0;
+        const dur     = durMs ? Math.floor(durMs/60000) + ':' + String(Math.floor((durMs%60000)/1000)).padStart(2,'0') : '—';
+        return `<div class="signals-track-row">
+            <div class="signals-rank" style="color:${rankCol}">${i + 1}</div>
+            ${art}
+            <div class="signals-info">
+                <div class="signals-name">${escHtml(t.name)}</div>
+                <div class="signals-sub">${artist}</div>
+            </div>
+            <div style="text-align:right;min-width:36px">
+                <div class="signals-pop" style="font-size:10px">${dur}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderSignalsArtists(artists) {
+    if (!artists.length) return '<div class="empty-state">No data for this time range.</div>';
+    return artists.map((a, i) => {
+        const art      = a.image ? `<img class="signals-art" src="${escHtml(a.image)}" alt="" loading="lazy" style="border-radius:50%">` : '<div class="signals-art-placeholder" style="border-radius:50%">◈</div>';
+        const genres   = (a.genres || []).slice(0, 2).join(' · ');
+        const rankCol  = i < 3 ? 'var(--quincy)' : 'var(--dim)';
+        const f        = typeof a.followers === 'number' ? a.followers : (typeof a.followers !== 'undefined' ? Number(a.followers) || 0 : null);
+        const followers = f === null ? '—' : f >= 1000000 ? (f/1000000).toFixed(1)+'M' : f >= 1000 ? Math.round(f/1000)+'K' : String(f);
+        return `<div class="signals-artist-row">
+            <div class="signals-rank" style="color:${rankCol}">${i + 1}</div>
+            ${art}
+            <div class="signals-info">
+                <div class="signals-name">${escHtml(a.name)}</div>
+                <div class="signals-sub">${genres || '—'}</div>
+            </div>
+            <div style="text-align:right;min-width:40px">
+                <div class="signals-pop" style="font-size:10px">${followers}</div>
+                <div style="font-size:8px;color:var(--dim);margin-top:1px">followers</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function setSignalsRange(btn, range) {
+    signalsRange = range;
+    document.querySelectorAll('.signals-range').forEach(b => b.classList.remove('active-range'));
+    btn.classList.add('active-range');
+    loadSignals(range);
+}
+// ═══════════════════════════════════════ ICON SYSTEM ═══
+// Loads SVG icons from assets/icons/ if available, falls back to emoji
+const ICON_EMOJIS = { prev:'⏮', play:'▶', pause:'⏸', next:'⏭', shuffle:'⇌', repeat:'↺', repeat1:'↺¹' };
+const ICON_FILES  = { prev:'prev.png', play:'play.png', pause:'pause.png', next:'next.png', shuffle:'shuffle.png', repeat:'repeat.png', repeat1:'repeat-one.png' };
+
+function loadTransportIcons() {
+    document.querySelectorAll('.t-icon-wrap').forEach(el => {
+        const key  = el.dataset.icon;
+        const file = ICON_FILES[key];
+        if (!file) return;
+        const img = new Image();
+        img.src = `assets/icons/${file}`;
+        img.onload = () => {
+            img.className = 't-icon';
+            el.innerHTML = '';
+            el.appendChild(img);
+        };
+        img.onerror = () => { /* keep emoji fallback */ };
+    });
+}
+
+function setTransportIcon(elId, iconKey) {
+    const btn = document.getElementById(elId);
+    if (!btn) return;
+    const wrap = btn.querySelector('.t-icon-wrap');
+    if (!wrap) return;
+    const file = ICON_FILES[iconKey];
+    if (!file) { wrap.textContent = ICON_EMOJIS[iconKey] || ''; return; }
+    const img = new Image();
+    img.src = `assets/icons/${file}`;
+    img.onload = () => { img.className = 't-icon'; wrap.innerHTML = ''; wrap.appendChild(img); };
+    img.onerror = () => { wrap.textContent = ICON_EMOJIS[iconKey] || ''; };
+}
+
+function updateSliderBg(slider, color) {
+    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.background = `linear-gradient(90deg,${color} ${pct}%,rgba(168,212,255,0.12) ${pct}%)`;
+}
+
+// Init slider backgrounds + preset dropdown on first load
+document.addEventListener('DOMContentLoaded', () => {
+    const vol = document.getElementById('volumeSlider');
+    const thr = document.getElementById('autoAddThresh');
+    if (vol) updateSliderBg(vol, 'var(--quincy)');
+    if (thr) updateSliderBg(thr, 'var(--neon)');
+    loadTransportIcons();
+    rebuildPresetSelect();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+loadData();
+startSSE();
+refreshDevices();
+
+// Sync full playback state (shuffle, repeat, volume) from Spotify on boot
+(async () => {
+    try {
+        const res  = await fetch('/api/player_state');
+        const state = await res.json();
+        if (state.error) return;
+
+        // Volume
+        if (typeof state.volume_percent === 'number') {
+            const slider = document.getElementById('volumeSlider');
+            const label  = document.getElementById('volLabel');
+            if (slider) { slider.value = state.volume_percent; updateSliderBg(slider, 'var(--quincy)'); }
+            if (label)  label.textContent = state.volume_percent + '%';
+        }
+
+        // Shuffle
+        shuffleState = state.shuffle_state || false;
+        const sBtn = document.getElementById('shuffleBtn');
+        if (sBtn) sBtn.classList.toggle('active-state', shuffleState);
+
+        // Repeat
+        repeatState = state.repeat_state || 'off';
+        const rBtn = document.getElementById('repeatBtn');
+        if (rBtn) {
+            rBtn.classList.remove('active-state', 'repeat-track');
+            if (repeatState === 'context')     { rBtn.classList.add('active-state'); setTransportIcon('repeatBtn', 'repeat'); }
+            else if (repeatState === 'track')  { rBtn.classList.add('repeat-track'); setTransportIcon('repeatBtn', 'repeat1'); }
+            else                               { setTransportIcon('repeatBtn', 'repeat'); }
+        }
+    } catch(_) {}
+})();
+</script>
+</body>
+</html>

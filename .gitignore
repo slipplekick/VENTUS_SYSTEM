@@ -1,0 +1,10 @@
+.env
+vibe_vault.db
+vibe_vault.csv.migrated
+node_modules/
+LAUNCH.bat
+__pycache__/
+*.pyc
+dist/
+build/
+vibe_dna.json

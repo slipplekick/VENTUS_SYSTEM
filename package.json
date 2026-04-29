@@ -1,0 +1,63 @@
+{
+  "name": "ventus-sys",
+  "version": "1.0.0",
+  "description": "VENTUS//SYS — Physics Engine v4",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "dependencies": {
+    "auto-launch": "^5.0.6"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.ventus.sys",
+    "productName": "VENTUS-SYS",
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VENTUS-SYS"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**"
+    ],
+    "extraResources": [
+      {
+        "from": "python-dist/",
+        "to": "python-dist/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "templates/",
+        "to": "app/templates/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": ".",
+        "to": "app/",
+        "filter": [
+          "app.py",
+          "learn.py",
+          "vibe_dna.json",
+          "vibe_vault.csv",
+          "master_vibe_training_set.csv"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
