@@ -188,8 +188,21 @@ def vault_all_as_df() -> pd.DataFrame:
     except: return pd.DataFrame()
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
-def find_col(df, keys):
-    return next((c for c in df.columns if any(k in c.lower() for k in keys)), None)
+def find_col(df, keys, exclude=None):
+    """
+    Return the first column whose lowercased name contains any of `keys`.
+    `exclude` is an optional list/set of column names to skip — prevents
+    the ID column from being re-matched as a name/song/track column.
+    Keys are checked in order so more-specific keys win.
+    """
+    excl = set(exclude or [])
+    for key in keys:
+        for c in df.columns:
+            if c in excl:
+                continue
+            if key in c.lower():
+                return c
+    return None
 
 def get_camelot(key, mode):
     try: k, m = int(key), int(mode)
@@ -288,6 +301,11 @@ def score_features(data):
 _sse_clients = []
 _sse_lock    = threading.Lock()
 
+# ── FAILED TRACKS CACHE ───────────────────────────────────────────────────────
+# Tracks that returned no data from ReccoBeats AND failed Ghost Signal.
+# Prevents infinite retry loops — once a track is known-bad, skip all API calls.
+FAILED_TRACKS: set = set()
+
 def _sse_broadcast(event_type, data):
     payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
     with _sse_lock:
@@ -298,35 +316,64 @@ def _sse_broadcast(event_type, data):
         for q in dead: _sse_clients.remove(q)
 
 # ── RECCOBEATS ────────────────────────────────────────────────────────────────
+# ReccoBeats returns audio features for up to 40 Spotify track IDs per call.
+# The response items do NOT echo back the Spotify ID directly — each item
+# contains an 'href' field whose last path segment IS the Spotify track ID.
+# Example href: "https://api.reccobeats.com/v1/audio-features/4uLU6hMCjMI75M1A2tKUQC"
+#                                                                              ^^^^^^^^^^^^^^^^^^^^^^
+# We build a lookup dict from that extracted ID back to the original tid so
+# the caller always receives a {spotify_track_id -> features} mapping.
 def fetch_reccobeats_batch(tids):
     if not tids: return {}
+    # Hard-limit batches to 40 — API silently drops extras beyond this
+    tids = tids[:40]
     try:
         res = requests.get(
-            f"https://api.reccobeats.com/v1/audio-features?ids={','.join(tids)}", timeout=15)
+            f"https://api.reccobeats.com/v1/audio-features?ids={','.join(tids)}",
+            timeout=15)
         if res.status_code != 200:
             if res.status_code >= 500:
-                _sse_broadcast("system_warning",{"type":"RECCOBEATS_OFFLINE",
-                    "message":f"Reccobeats {res.status_code} — Deep Scans elevated. Local engine active."})
+                _sse_broadcast("system_warning", {"type": "RECCOBEATS_OFFLINE",
+                    "message": f"Reccobeats {res.status_code} — Deep Scans elevated. Local engine active."})
             return {}
         batch = {}
-        for raw in res.json().get('content',[]):
-            tid = raw.get('id')
-            if tid:
-                batch[tid] = {
-                    'energy':           round(raw.get('energy',0)*100,4),
-                    'valence':          round(raw.get('valence',0)*100,4),
-                    'danceability':     round(raw.get('danceability',0)*100,4),
-                    'bpm':              round(raw.get('tempo',0),3),
-                    'acousticness':     round(raw.get('acousticness',0)*100,4),
-                    'instrumentalness': round(raw.get('instrumentalness',0)*100,4),
-                    'loudness':         round(raw.get('loudness',0),3),
-                    'key':              raw.get('key',-1),
-                    'mode':             raw.get('mode',1),
-                }
+        for raw in res.json().get('content', []):
+            # Primary strategy: extract Spotify ID from the href path tail
+            href = raw.get('href', '')
+            tid_from_href = href.rstrip('/').split('/')[-1] if href else ''
+            # Fallback: some response versions include 'id' or 'spotifyId' directly
+            tid_direct = raw.get('id') or raw.get('spotifyId') or raw.get('trackId') or ''
+            # Pick whichever candidate actually matches one of our requested IDs
+            tid = None
+            if tid_from_href and tid_from_href in tids:
+                tid = tid_from_href
+            elif tid_direct and tid_direct in tids:
+                tid = tid_direct
+            if not tid:
+                continue
+            # All percentage-scale fields (energy, valence, etc.) come back as
+            # 0.0–1.0 floats; multiply by 100 to normalise to our 0–100 scale.
+            # BPM / tempo, loudness, key, and mode are already in native units.
+            e   = raw.get('energy',           0) or 0
+            v   = raw.get('valence',          0) or 0
+            d   = raw.get('danceability',     0) or 0
+            ac  = raw.get('acousticness',     0) or 0
+            ins = raw.get('instrumentalness', 0) or 0
+            batch[tid] = {
+                'energy':           round(e   * 100 if e   <= 1.0 else e,   4),
+                'valence':          round(v   * 100 if v   <= 1.0 else v,   4),
+                'danceability':     round(d   * 100 if d   <= 1.0 else d,   4),
+                'bpm':              round(raw.get('tempo', 0) or 0,         3),
+                'acousticness':     round(ac  * 100 if ac  <= 1.0 else ac,  4),
+                'instrumentalness': round(ins * 100 if ins <= 1.0 else ins, 4),
+                'loudness':         round(raw.get('loudness', 0) or 0,      3),
+                'key':              int(raw.get('key',  -1) if raw.get('key')  is not None else -1),
+                'mode':             int(raw.get('mode',  1) if raw.get('mode') is not None else  1),
+            }
         return batch
     except requests.exceptions.ConnectionError:
-        _sse_broadcast("system_warning",{"type":"RECCOBEATS_OFFLINE",
-            "message":"Reccobeats unreachable — local physics engine handling Deep Scans."})
+        _sse_broadcast("system_warning", {"type": "RECCOBEATS_OFFLINE",
+            "message": "Reccobeats unreachable — local physics engine handling Deep Scans."})
         return {}
     except Exception as e:
         print(f"[WARN] Reccobeats batch: {e}"); return {}
@@ -422,23 +469,41 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
             except: pass
 
 # ── SHARED 4-TIER RESOLVER ────────────────────────────────────────────────────
-def resolve_features(track_id:str, token:str|None=None,
-                     allow_ghost:bool=True) -> tuple:
-    """(feat_dict | None, method_label, source_label)"""
-    feat = vault_get(track_id)
-    if feat: return feat, "VAULT CACHE", "local"
+def resolve_features(track_id: str, token: str | None = None,
+                     allow_ghost: bool = True) -> tuple:
+    """
+    Returns (feat_dict | None, method_label, source_label).
 
+    Resolution order:
+      1. SQLite vault  — instant, no network
+      2. ReccoBeats    — batch API (skipped if track is in FAILED_TRACKS)
+      3. Ghost Signal  — librosa local analysis (skipped if allow_ghost=False)
+      4. void          — nothing worked; track added to FAILED_TRACKS
+    """
+    # 1. Vault hit — fastest path
+    feat = vault_get(track_id)
+    if feat:
+        return feat, "VAULT CACHE", "local"
+
+    # 2. Skip known-bad tracks immediately — prevents infinite retry loops
+    if track_id in FAILED_TRACKS:
+        return None, "NO SIGNAL (CACHED FAIL)", "void"
+
+    # 3. ReccoBeats single-track lookup
     feat = fetch_reccobeats(track_id)
     if feat:
-        vault_insert([{'id':track_id,**feat}])
+        vault_insert([{'id': track_id, **feat}])
         return feat, "RECCOBEATS API", "api"
 
+    # 4. Ghost Signal Decryption (librosa local analysis from preview audio)
     if allow_ghost and token:
         feat = decrypt_ghost_signal(track_id, token)
         if feat:
-            vault_insert([{'id':track_id,**feat}])
-            return {k:v for k,v in feat.items() if k!='_source'}, "LOCAL ACOUSTIC ENGINE", "ghost_decrypted"
+            vault_insert([{'id': track_id, **feat}])
+            return {k: v for k, v in feat.items() if k != '_source'}, "LOCAL ACOUSTIC ENGINE", "ghost_decrypted"
 
+    # 5. All tiers exhausted — cache the failure to avoid future retries
+    FAILED_TRACKS.add(track_id)
     return None, "NO SIGNAL", "void"
 
 # ── PLAYLIST PAGINATION ───────────────────────────────────────────────────────
@@ -524,6 +589,42 @@ def vibe_profile():
     TASTE_PROFILE = get_taste_profile()
     return jsonify(TASTE_PROFILE)
 
+@app.route('/api/wipe_profile', methods=['POST'])
+def wipe_profile():
+    """
+    Clears the master_vibe_training_set.csv back to headers-only,
+    resets the in-memory TASTE_PROFILE to defaults, and clears
+    FAILED_TRACKS so every track gets a fresh resolution attempt.
+    """
+    global TASTE_PROFILE
+    master_path = os.path.join(_HERE, 'master_vibe_training_set.csv')
+    try:
+        # Preserve the header row; wipe all data rows
+        if os.path.exists(master_path):
+            try:
+                df = pd.read_csv(master_path, nrows=0)   # headers only
+                df.to_csv(master_path, index=False)
+            except Exception:
+                # If the file is malformed just write a clean skeleton
+                pd.DataFrame(columns=[
+                    'Spotify Track ID','Song','Artist','Added At',
+                    'Energy','Valence','Danceability','BPM',
+                    'Acousticness','Instrumentalness','Loudness','Camelot'
+                ]).to_csv(master_path, index=False)
+        else:
+            pd.DataFrame(columns=[
+                'Spotify Track ID','Song','Artist','Added At',
+                'Energy','Valence','Danceability','BPM',
+                'Acousticness','Instrumentalness','Loudness','Camelot'
+            ]).to_csv(master_path, index=False)
+        # Reset live profile to fallback defaults
+        TASTE_PROFILE = get_taste_profile()
+        # Clear failed-tracks cache — fresh slate for next sync
+        FAILED_TRACKS.clear()
+        return jsonify({"success": True, "message": "TASTE PROFILE WIPED — ready for new sync."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/vibe_dna')
 def vibe_dna():
     try:
@@ -555,14 +656,21 @@ def get_vault_data():
 
 @app.route('/api/tracks')
 def get_tracks():
-    try: df = pd.read_csv(os.path.join(_HERE,'master_vibe_training_set.csv')).fillna("")
-    except Exception as e: return jsonify({"error":str(e)}),500
-    n_c =find_col(df,['name','song','track']); a_c=find_col(df,['artist'])
+    csv_path = os.path.join(_HERE, 'master_vibe_training_set.csv')
+    try:
+        df = pd.read_csv(csv_path).fillna("")
+    except FileNotFoundError:
+        # First-run: no master CSV yet — return empty list, not an error
+        return jsonify([])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    id_c=find_col(df,['spotify track id','track id','id'])
+    n_c =find_col(df,['song','name','track'], exclude=[id_c]); a_c=find_col(df,['artist'])
     k_c =find_col(df,['camelot','key']);       e_c=find_col(df,['energy'])
     v_c =find_col(df,['valence']);             d_c=find_col(df,['dance'])
     p_c =find_col(df,['pop']);                 b_c=find_col(df,['bpm','tempo'])
     ac_c=find_col(df,['acoustic']);           in_c=find_col(df,['instrument'])
-    lo_c=find_col(df,['loud']);               id_c=find_col(df,['spotify track id','track id','id'])
+    lo_c=find_col(df,['loud'])
     def fv(r,col,scale=False):
         if not col: return 0
         try:
@@ -626,8 +734,8 @@ def audit_playlist():
     cached = vault_get_many(all_ids)
     uncached = [tid for tid in all_ids if tid not in cached]
     if uncached:
-        for i in range(0, len(uncached), 50):
-            bd = fetch_reccobeats_batch(uncached[i:i+50])
+        for i in range(0, len(uncached), 40):
+            bd = fetch_reccobeats_batch(uncached[i:i+40])
             if bd:
                 vault_insert([{'id':tid,**feat} for tid,feat in bd.items()])
         cached = vault_get_many(all_ids)
@@ -675,11 +783,23 @@ def sync_playlist():
     except ValueError as e: return jsonify({"error":str(e)}),400
 
     master_path = os.path.join(_HERE,'master_vibe_training_set.csv')
-    df     = pd.read_csv(master_path)
+    # Gracefully handle missing or empty CSV (first-run scenario)
+    try:
+        df = pd.read_csv(master_path)
+    except FileNotFoundError:
+        # Create a minimal skeleton so the sync can proceed
+        df = pd.DataFrame(columns=[
+            'Spotify Track ID','Song','Artist','Added At',
+            'Energy','Valence','Danceability','BPM',
+            'Acousticness','Instrumentalness','Loudness','Camelot'
+        ])
+        df.to_csv(master_path, index=False)
+    except Exception as e:
+        return jsonify({"error": f"Could not read master CSV: {e}"}), 500
     id_col = find_col(df,['spotify track id','track id','id'])
     if not id_col: return jsonify({"error":"Could not find ID column"}),500
 
-    n_col =find_col(df,['name','song','track']); a_col =find_col(df,['artist'])
+    n_col =find_col(df,['song','name','track'], exclude=[id_col]); a_col =find_col(df,['artist'])
     dt_col=find_col(df,['added at','date']) or 'Added At'
     e_col =find_col(df,['energy'])  or 'Energy';    v_col =find_col(df,['valence'])  or 'Valence'
     d_col =find_col(df,['dance'])   or 'Danceability'; b_col=find_col(df,['bpm','tempo']) or 'BPM'
@@ -694,8 +814,8 @@ def sync_playlist():
         to_fetch.append(t['id']); track_meta[t['id']]=t; existing.add(t['id'])
 
     new_rows=[]
-    for i in range(0,len(to_fetch),50):
-        chunk = to_fetch[i:i+50]
+    for i in range(0,len(to_fetch),40):
+        chunk = to_fetch[i:i+40]
         bd    = fetch_reccobeats_batch(chunk)
         for tid in chunk:
             meta = track_meta[tid]; feat = bd.get(tid,{})
@@ -739,8 +859,8 @@ def sync_vault_from_playlist():
     to_fetch   = [tid for tid in all_ids if tid not in cached_map]
     added,ghosted = 0,0
 
-    for i in range(0,len(to_fetch),50):
-        chunk=to_fetch[i:i+50]; bd=fetch_reccobeats_batch(chunk)
+    for i in range(0,len(to_fetch),40):
+        chunk=to_fetch[i:i+40]; bd=fetch_reccobeats_batch(chunk)
         vault_insert([{'id':tid,**feat} for tid,feat in bd.items()])
         added+=len(bd); ghosted+=len(chunk)-len(bd)
 
@@ -834,8 +954,8 @@ def get_queue():
             "id":tid,"name":t['name'],
             "artist":t['artists'][0]['name'] if t.get('artists') else "Unknown",
             "score":score,"verdict":verdict,"camelot":camelot,
-            "energy":round(feat['energy'])  if feat else None,
-            "valence":round(feat['valence']) if feat else None,
+            "energy": round(feat['energy'])  if (feat and feat.get('energy')  is not None) else None,
+            "valence":round(feat['valence']) if (feat and feat.get('valence') is not None) else None,
         })
     return jsonify(results)
 
@@ -897,7 +1017,8 @@ def rebuild_dna():
     master_path=os.path.join(_HERE,'master_vibe_training_set.csv')
     try:    df=pd.read_csv(master_path,encoding='utf-8-sig').fillna("")
     except: df=pd.read_csv(master_path).fillna("")
-    n_col=find_col(df,['track','song','name']); a_col=find_col(df,['artist'])
+    id_col=find_col(df,['spotify track id','track id','id'])
+    n_col=find_col(df,['song','name','track'], exclude=[id_col]); a_col=find_col(df,['artist'])
     if not n_col or not a_col: return jsonify({"error":"Cannot find track/artist columns"}),500
     SKIP={'seen live','favorites','favourite','spotify','track'}
     tag_counts={}
