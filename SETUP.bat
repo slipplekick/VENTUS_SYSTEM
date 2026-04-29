@@ -113,14 +113,19 @@ if not exist "package.json" (
     pause
     exit /b 1
 )
-echo  Running npm install...
-call npm install --loglevel=error
-if %errorlevel% neq 0 (
-    echo  [X] npm install failed. Check your internet connection.
-    pause
-    exit /b 1
+if exist "node_modules" (
+    echo  [OK] node_modules\ already present ^— skipping npm install.
+    echo  [i] Delete node_modules\ and re-run SETUP.bat to force a clean reinstall.
+) else (
+    echo  Running npm install...
+    call npm install --loglevel=error
+    if !errorlevel! neq 0 (
+        echo  [X] npm install failed. Check your internet connection.
+        pause
+        exit /b 1
+    )
+    echo  [OK] Node modules installed.
 )
-echo  [OK] Node modules installed.
 
 
 :: ─────────────────────────────────────────────────────────────────────────────
