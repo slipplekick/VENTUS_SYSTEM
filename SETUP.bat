@@ -1,4 +1,7 @@
 @echo off
+:: Force the script to run in the folder it is located in
+cd /d "%~dp0"
+
 setlocal EnableDelayedExpansion
 title VENTUS // SETUP
 color 0B
@@ -74,7 +77,7 @@ for /f "tokens=*" %%i in ('npm --version 2^>^&1') do echo  [OK] npm %%i
 
 :: ─────────────────────────────────────────────────────────────────────────────
 echo.
-echo [3/7] Installing Python dependencies...
+echo[3/7] Installing Python dependencies...
 echo ────────────────────────────────────────────────────────
 
 python -m pip install --upgrade pip --quiet
@@ -106,11 +109,12 @@ echo ─────────────────────────
 if not exist "package.json" (
     echo  [X] package.json not found.
     echo      Make sure you are running SETUP.bat from inside the VENTUS project folder.
+    echo      Current folder: %CD%
     pause
     exit /b 1
 )
 echo  Running npm install...
-npm install --loglevel=error
+call npm install --loglevel=error
 if %errorlevel% neq 0 (
     echo  [X] npm install failed. Check your internet connection.
     pause
