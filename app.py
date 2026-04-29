@@ -177,10 +177,29 @@ def vault_insert(rows: list, source: str = 'reccobeats'):
         ))
     try:
         with _db() as c:
-            c.executemany("""INSERT OR REPLACE INTO vault
-                (id,energy,valence,danceability,bpm,acousticness,
-                 instrumentalness,loudness,key,mode,source)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)""", clean)
+            # Protect Ghost Signal rows — never let reccobeats data overwrite local_engine.
+            # Split: local_engine rows always INSERT OR REPLACE (they ARE the authority).
+            # reccobeats rows use INSERT OR IGNORE if a local_engine row already exists.
+            ghost_rows = [r for r in clean if r[10] == 'local_engine']
+            rb_rows    = [r for r in clean if r[10] != 'local_engine']
+
+            if ghost_rows:
+                c.executemany("""INSERT OR REPLACE INTO vault
+                    (id,energy,valence,danceability,bpm,acousticness,
+                     instrumentalness,loudness,key,mode,source)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""", ghost_rows)
+
+            if rb_rows:
+                # Only insert if no local_engine row exists for this id
+                existing_ghost = {r[0] for r in c.execute(
+                    "SELECT id FROM vault WHERE source='local_engine'").fetchall()}
+                safe_rb = [r for r in rb_rows if r[0] not in existing_ghost]
+                if safe_rb:
+                    c.executemany("""INSERT OR REPLACE INTO vault
+                        (id,energy,valence,danceability,bpm,acousticness,
+                         instrumentalness,loudness,key,mode,source)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?)""", safe_rb)
+
             c.commit()
     except Exception as e:
         print(f"[VAULT] insert: {e}")
@@ -1096,10 +1115,12 @@ def backfill_vault():
         return jsonify({"error": "Cannot find ID column in CSV"}), 500
 
     existing = set()
+    ghost_protected = set()
     try:
         with _db() as c:
-            rows_db = c.execute("SELECT id FROM vault").fetchall()
-            existing = {r['id'] for r in rows_db}
+            rows_db = c.execute("SELECT id, source FROM vault").fetchall()
+            existing        = {r['id'] for r in rows_db}
+            ghost_protected = {r['id'] for r in rows_db if r['source'] == 'local_engine'}
     except: pass
 
     vault_rows = []
@@ -1109,6 +1130,8 @@ def backfill_vault():
     for _, r in df.iterrows():
         tid = str(r.get(id_col, '')).strip()
         if not tid or tid == 'nan': continue
+        if tid in ghost_protected:
+            already_in += 1; continue  # Ghost Signal data is precious — never overwrite
         if tid in existing:
             already_in += 1; continue
 
@@ -1141,12 +1164,14 @@ def backfill_vault():
         vault_insert(vault_rows)
 
     return jsonify({
-        "success":      True,
-        "inserted":     len(vault_rows),
-        "already_had":  already_in,
-        "skipped_null": skipped_null,
-        "vault_total":  vault_count(),
+        "success":        True,
+        "inserted":       len(vault_rows),
+        "already_had":    already_in,
+        "skipped_null":   skipped_null,
+        "ghost_protected":len(ghost_protected),
+        "vault_total":    vault_count(),
         "message": (f"BACKFILL COMPLETE — {len(vault_rows)} tracks pushed to vault. "
+                    f"{len(ghost_protected)} Ghost Signal rows protected. "
                     f"{skipped_null} null-metric tracks skipped. "
                     f"{already_in} already cached.")
     })

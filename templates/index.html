@@ -1754,15 +1754,45 @@ async function loadData() {
         } catch(e) { console.error('dnaGrid render', e); }
 
         try {
-            const validTracks = tracks.filter(t => t.energy > 0 || t.bpm > 0);
-            const nullCount   = tracks.length - validTracks.length;
-            document.getElementById('trackList').innerHTML = validTracks.map(t => {
-                const score = calcScore(t.energy, t.valence, t.dance, t.acousticness, t.instrumentalness, t.loudness, t.bpm);
+            // Build a vault lookup map for precise float values — CSV values are rounded integers
+            // which causes scoring drift. Vault has the original ReccoBeats floats.
+            const vaultMap = {};
+            vaultData.forEach(v => { vaultMap[v.id] = v; });
+            const ghostCount = tracks.filter(t => t.energy === 0 && t.bpm === 0).length;
+            let realIdx = 0; // sequential counter for non-ghost tracks
+            document.getElementById('trackList').innerHTML = tracks.map((t, i) => {
+                const isGhost = t.energy === 0 && t.bpm === 0;
+                if (isGhost) return `
+                <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 80px 80px;opacity:0.45">
+                    <div class="col-num">${i + 1}</div>
+
+                    <div class="col-info">
+                        <div class="col-name">${escHtml(t.song)}</div>
+                        <div class="col-sub">${escHtml(t.artist)} <span class="phase-tag" style="border-color:var(--dim);color:var(--dim)">GHOST</span></div>
+                    </div>
+                    <div class="col-key">--</div>
+                    <div class="col-stat" style="color:var(--dim)">--</div>
+                    <div class="col-stat" style="color:var(--dim)">--</div>
+                    <div class="col-stat" style="color:var(--dim)">--</div>
+                    <div class="col-stat" style="color:var(--dim)">--</div>
+                    <div class="col-stat" style="color:var(--dim)">--</div>
+                    <div class="col-score void-sig">--</div>
+                </div>`;
+                // Use vault floats for scoring if available, CSV rounded ints as fallback
+                const v    = vaultMap[t.id];
+                const e    = v ? v.energy           : t.energy;
+                const val  = v ? v.valence          : t.valence;
+                const d    = v ? v.danceability     : t.dance;
+                const ac   = v ? v.acousticness     : t.acousticness;
+                const ins  = v ? v.instrumentalness : t.instrumentalness;
+                const lo   = v ? v.loudness         : t.loudness;
+                const b    = v ? v.bpm              : t.bpm;
+                const score = calcScore(e, val, d, ac, ins, lo, b);
                 const vc   = verdictClass(scoreToVerdict(score));
                 const tier = getTier(score);
                 return `
                 <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 80px 80px;">
-                    <div class="col-num">${t.num}</div>
+                    <div class="col-num">${++realIdx}</div>
                     <div class="col-info">
                         <div class="col-name">${escHtml(t.song)}</div>
                         <div class="col-sub">${escHtml(t.artist)} <span class="phase-tag" style="border-color:${tier.color}33;color:${tier.color}">${tier.tier}</span></div>
@@ -1776,7 +1806,7 @@ async function loadData() {
                     <div class="col-score ${vc}">${score}%</div>
                 </div>`;
             }).join('')
-            + (nullCount > 0 ? `<div class="empty-state" style="color:var(--dim);font-size:10px;padding:8px 16px">${nullCount} track${nullCount>1?'s':''} hidden — no audio features (Spotify preview unavailable)</div>` : '')
+            + (ghostCount > 0 ? `<div class="empty-state" style="color:var(--dim);font-size:10px;padding:8px 16px">↑ ${ghostCount} GHOST track${ghostCount>1?'s':''} — no Spotify preview available (niche/new release)</div>` : '')
             || '<div class="empty-state">No tracks loaded. Check Flask server.</div>';
         } catch(e) { console.error('trackList render', e); }
 
@@ -1864,6 +1894,7 @@ function renderVault() {
             acousticness:     Math.round(v.acousticness),
             instrumentalness: Math.round(v.instrumentalness),
             loudness:         v.loudness,
+            source:           v.source || 'reccobeats',
         };
     }).filter(t => {
         if (!q) return true;
@@ -1880,15 +1911,37 @@ function renderVault() {
     else if (sort === 'acoustic_desc')  filtered.sort((a,b) => b.acousticness - a.acousticness);
     else if (sort === 'loudness_desc')  filtered.sort((a,b) => b.loudness - a.loudness);
 
+    let vaultIdx = 0;
     const html = filtered.map(t => {
-        const tier = getTier(t._score);
-        const vc = verdictClass(scoreToVerdict(t._score));
-        return `
-        <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
-            <div class="col-num">${t.num}</div>
+        const isNoData   = t.energy === 0 && t.bpm === 0;
+        const isGhostSig = t.source === 'local_engine';  // librosa Ghost Signal data — real metrics!
+        const rowNum     = ++vaultIdx;
+        if (isNoData) return `
+        <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;opacity:0.45">
+            <div class="col-num">${rowNum}</div>
             <div class="col-info">
                 <div class="col-name">${escHtml(t.song)}</div>
-                <div class="col-sub">${escHtml(t.artist)} <span class="phase-tag" style="border-color:${tier.color}33;color:${tier.color}">${tier.tier}</span></div>
+                <div class="col-sub">${escHtml(t.artist)} <span class="phase-tag" style="border-color:var(--dim);color:var(--dim)">GHOST</span></div>
+            </div>
+            <div class="col-key">--</div>
+            <div class="col-stat" style="color:var(--dim)">--</div>
+            <div class="col-stat" style="color:var(--dim)">--</div>
+            <div class="col-stat" style="color:var(--dim)">--</div>
+            <div class="col-stat" style="color:var(--dim)">--</div>
+            <div class="col-score void-sig">--</div>
+        </div>`;
+        const tier = getTier(t._score);
+        const vc = verdictClass(scoreToVerdict(t._score));
+        // Ghost Signal rows: real librosa data but scored from local audio engine, not ReccoBeats
+        const ghostSigBadge = isGhostSig
+            ? ` <span class="phase-tag" style="border-color:var(--quincy);color:var(--quincy);font-size:9px">GHOST SIG</span>`
+            : '';
+        return `
+        <div class="list-item" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
+            <div class="col-num">${rowNum}</div>
+            <div class="col-info">
+                <div class="col-name">${escHtml(t.song)}</div>
+                <div class="col-sub">${escHtml(t.artist)} <span class="phase-tag" style="border-color:${tier.color}33;color:${tier.color}">${tier.tier}</span>${ghostSigBadge}</div>
             </div>
             <div class="col-key">${t.key || '--'}</div>
             <div class="col-stat">${t.energy}%</div>
