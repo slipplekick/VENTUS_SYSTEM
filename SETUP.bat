@@ -222,11 +222,11 @@ start https://developer.spotify.com/dashboard
 echo  2. Log in with your Spotify account.
 echo  3. Click "Create app".
 echo  4. Fill in any name and description (e.g. VENTUS).
-echo  5. In the Redirect URI box, type EXACTLY:
+echo  5. In the Redirect URI box, type EXACTLY (copy-paste this):
 echo.
 echo       http://127.0.0.1:8888/callback
 echo.
-echo     (copy-paste that -- no spaces, no slash at the end)
+echo     WARNING: Must be 127.0.0.1 NOT localhost. No trailing slash.
 echo  6. Tick "Web API" under APIs used, then click Save.
 echo  7. Open your new app and click Settings to see your Client ID and Secret.
 echo.
@@ -249,13 +249,12 @@ set /p SPOTIFY_CLIENT_SECRET=  Spotify Client Secret:
 if "!SPOTIFY_CLIENT_SECRET!"=="" goto :missing_secret
 
 echo.
-echo  Last.fm is used for genre and mood data. Get a free key at:
-echo  https://www.last.fm/api/account/create
-echo  (takes 2 minutes -- fill in any app name)
+echo  Last.fm is used for genre tagging (optional — you can add it later).
+echo  Get a free key at: https://www.last.fm/api/account/create
+echo  Press ENTER to skip, or paste your key:
 echo.
-start https://www.last.fm/api/account/create
-set /p LFM_KEY=  Last.fm API key: 
-if "!LFM_KEY!"=="" goto :missing_lfm
+set /p LFM_KEY=  Last.fm API key (or press ENTER to skip): 
+if "!LFM_KEY!"=="" set LFM_KEY=NONE
 
 echo.
 echo  -- PART C: Log in to Spotify --
@@ -279,11 +278,6 @@ exit /b 1
 
 :missing_secret
 echo  No Client Secret entered. Run SETUP.bat again.
-pause
-exit /b 1
-
-:missing_lfm
-echo  No Last.fm key entered. Run SETUP.bat again.
 pause
 exit /b 1
 

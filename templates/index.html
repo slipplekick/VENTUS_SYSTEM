@@ -1042,98 +1042,6 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
         </div>
         <div id="autoSyncStatus" style="font-size:9px;color:var(--dim);padding:2px 0 6px;display:none">◈ Syncing every 5 min</div>
 
-        <!-- ═══ CUSTOM PROMPT MODAL ═══ -->
-        <div id="customPromptOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.92);z-index:10000;align-items:center;justify-content:center">
-            <div style="background:var(--panel);border:1px solid var(--border2);border-top:2px solid var(--quincy);border-radius:4px;width:440px;box-shadow:0 0 60px rgba(77,184,255,0.14);padding:0">
-                <div style="padding:18px 20px 14px;border-bottom:1px solid var(--border)">
-                    <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:10px" id="customPromptTag">// INPUT REQUIRED</div>
-                    <div style="font-family:'Barlow Condensed';font-weight:700;font-size:18px;color:var(--sovereign)" id="customPromptLabel">Enter value</div>
-                </div>
-                <div style="padding:16px 20px">
-                    <input type="text" id="customPromptInput" class="sys-input" style="margin-bottom:0" placeholder="Paste here…">
-                </div>
-                <div style="padding:0 20px 16px;display:flex;gap:8px;justify-content:flex-end">
-                    <button id="customPromptCancel"
-                        style="padding:9px 18px;background:none;border:1px solid var(--border2);color:var(--dim);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);letter-spacing:1px;transition:all 0.15s"
-                        onmouseover="this.style.borderColor='var(--quincy)';this.style.color='var(--text)'"
-                        onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--dim)'">CANCEL</button>
-                    <button id="customPromptOk"
-                        style="padding:9px 20px;background:rgba(77,184,255,0.1);border:1px solid var(--quincy);color:var(--quincy);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);letter-spacing:1px;clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%);transition:all 0.15s"
-                        onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
-                        onmouseout="this.style.background='rgba(77,184,255,0.1)';this.style.color='var(--quincy)'">CONFIRM ⟶</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ═══ FIRST-RUN PLAYLIST PICKER ═══ -->
-        <div id="firstRunOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.96);z-index:10001;align-items:center;justify-content:center">
-            <div style="background:var(--panel);border:1px solid var(--border2);border-top:2px solid var(--quincy);border-radius:4px;width:520px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 0 80px rgba(77,184,255,0.18)">
-
-                <!-- header -->
-                <div style="padding:20px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-                    <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--quincy);letter-spacing:3px;margin-bottom:8px">◈ WELCOME TO VENTUS</div>
-                    <div style="font-family:'Barlow Condensed';font-weight:700;font-size:20px;color:var(--sovereign);margin-bottom:4px">Choose Your Taste Profile Playlist</div>
-                    <div style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);line-height:1.5">VENTUS learns your taste from a playlist you already love.<br>Pick one from your library, or paste any Spotify playlist ID.</div>
-                </div>
-
-                <!-- playlist list -->
-                <div id="firstRunList" style="flex:1;overflow-y:auto;padding:10px 12px;min-height:120px">
-                    <div style="text-align:center;padding:28px;color:var(--dim);font-family:'Share Tech Mono';font-size:10px">
-                        <div id="firstRunSpinner" style="margin-bottom:8px">◈ LOADING YOUR PLAYLISTS…</div>
-                    </div>
-                </div>
-
-                <!-- manual fallback -->
-                <div style="padding:10px 22px;border-top:1px solid var(--border);flex-shrink:0">
-                    <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);margin-bottom:6px;letter-spacing:1px">// OR PASTE A PLAYLIST ID / URL MANUALLY</div>
-                    <div style="display:flex;gap:8px">
-                        <input type="text" id="firstRunManualInput" class="sys-input"
-                            style="flex:1;margin:0;font-size:11px"
-                            placeholder="spotify:playlist:37i9dQZF1DX… or full URL">
-                        <button onclick="firstRunConfirmManual()"
-                            style="padding:8px 16px;background:rgba(77,184,255,0.08);border:1px solid var(--quincy);color:var(--quincy);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);white-space:nowrap;transition:all 0.15s"
-                            onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
-                            onmouseout="this.style.background='rgba(77,184,255,0.08)';this.style.color='var(--quincy)'">USE THIS ⟶</button>
-                    </div>
-                </div>
-
-                <!-- footer -->
-                <div style="padding:10px 22px 14px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);flex-shrink:0">
-                    <button onclick="firstRunSkip()"
-                        style="background:none;border:none;color:var(--dim);font-family:'Share Tech Mono';font-size:9px;cursor:pointer;letter-spacing:1px;transition:color 0.15s"
-                        onmouseover="this.style.color='var(--text)'"
-                        onmouseout="this.style.color='var(--dim)'">SKIP — I'LL SYNC MANUALLY</button>
-                    <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim)" id="firstRunCount"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ═══ PRESET MANAGER MODAL ═══ -->
-        <div id="presetManagerOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.85);z-index:9999;align-items:center;justify-content:center">
-            <div style="background:var(--panel);border:1px solid var(--border2);border-radius:4px;width:420px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(77,184,255,0.12)">
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--border)">
-                    <span style="font-family:'Share Tech Mono';font-size:11px;letter-spacing:2px;color:var(--quincy)">// PLAYLIST PRESETS</span>
-                    <button onclick="closePresetManager()" style="background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer;line-height:1">✕</button>
-                </div>
-                <div id="presetList" style="flex:1;overflow-y:auto;padding:10px 14px;min-height:60px"></div>
-                <div style="padding:12px 14px;border-top:1px solid var(--border)">
-                    <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:8px">// ADD PRESET</div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center">
-                        <input type="text" id="newPresetName" class="sys-input"
-                            placeholder="Name (e.g. SUMMER HEAT)"
-                            style="font-size:11px;padding:7px 9px;margin-bottom:0">
-                        <input type="text" id="newPresetId" class="sys-input"
-                            placeholder="Spotify playlist ID"
-                            style="font-size:11px;padding:7px 9px;margin-bottom:0">
-                        <button onclick="addPreset()"
-                            style="padding:7px 14px;background:var(--quincy2);border:none;color:#fff;font-family:'Share Tech Mono';font-size:11px;cursor:pointer;border-radius:var(--radius);white-space:nowrap;transition:background 0.15s"
-                            onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
-                            onmouseout="this.style.background='var(--quincy2)';this.style.color='#fff'">+ ADD</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Score sparkline -->
         <div style="margin-bottom:8px">
             <div style="font-family:'Share Tech Mono';font-size:11px;color:var(--dim);letter-spacing:1px;margin-bottom:5px;">// SESSION TREND</div>
@@ -1231,7 +1139,7 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
         <div class="page-title">SIGNAL // <span>VAULT</span></div>
         <div class="vault-filter-row">
             <input type="text" class="sys-input" id="vaultSearch"
-                placeholder="Search track, artist, era, phase tag…" oninput="renderVault()">
+                placeholder="Search track, artist, era, phase tag…" oninput="debouncedRenderVault()">
             <select class="filter-select" id="vaultSort" onchange="renderVault()">
                 <option value="num">ORDER: DEFAULT</option>
                 <option value="score_desc">SCORE: HIGH → LOW</option>
@@ -1465,6 +1373,103 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
     </div>
 </div><!-- end .main -->
 
+<!-- ═══════════════════════════════════════════════════════════════════════
+     MODAL OVERLAYS — must be direct children of <body>, NOT inside any
+     overflow:auto container (like #liveModule) or position:fixed breaks.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- ═══ CUSTOM PROMPT MODAL ═══ -->
+<div id="customPromptOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.92);z-index:10000;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--border2);border-top:2px solid var(--quincy);border-radius:4px;width:440px;box-shadow:0 0 60px rgba(77,184,255,0.14);padding:0">
+        <div style="padding:18px 20px 14px;border-bottom:1px solid var(--border)">
+            <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:10px" id="customPromptTag">// INPUT REQUIRED</div>
+            <div style="font-family:'Barlow Condensed';font-weight:700;font-size:18px;color:var(--sovereign)" id="customPromptLabel">Enter value</div>
+        </div>
+        <div style="padding:16px 20px">
+            <input type="text" id="customPromptInput" class="sys-input" style="margin-bottom:0" placeholder="Paste here…">
+        </div>
+        <div style="padding:0 20px 16px;display:flex;gap:8px;justify-content:flex-end">
+            <button id="customPromptCancel"
+                style="padding:9px 18px;background:none;border:1px solid var(--border2);color:var(--dim);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);letter-spacing:1px;transition:all 0.15s"
+                onmouseover="this.style.borderColor='var(--quincy)';this.style.color='var(--text)'"
+                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--dim)'">CANCEL</button>
+            <button id="customPromptOk"
+                style="padding:9px 20px;background:rgba(77,184,255,0.1);border:1px solid var(--quincy);color:var(--quincy);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);letter-spacing:1px;clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%);transition:all 0.15s"
+                onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
+                onmouseout="this.style.background='rgba(77,184,255,0.1)';this.style.color='var(--quincy)'">CONFIRM ⟶</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ FIRST-RUN PLAYLIST PICKER ═══ -->
+<div id="firstRunOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.96);z-index:10001;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--border2);border-top:2px solid var(--quincy);border-radius:4px;width:520px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 0 80px rgba(77,184,255,0.18)">
+
+        <!-- header -->
+        <div style="padding:20px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--quincy);letter-spacing:3px;margin-bottom:8px">◈ WELCOME TO VENTUS</div>
+            <div style="font-family:'Barlow Condensed';font-weight:700;font-size:20px;color:var(--sovereign);margin-bottom:4px">Choose Your Taste Profile Playlist</div>
+            <div style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);line-height:1.5">VENTUS learns your taste from a playlist you already love.<br>Pick one from your library, or paste any Spotify playlist ID.</div>
+        </div>
+
+        <!-- playlist list -->
+        <div id="firstRunList" style="flex:1;overflow-y:auto;padding:10px 12px;min-height:120px">
+            <div style="text-align:center;padding:28px;color:var(--dim);font-family:'Share Tech Mono';font-size:10px">
+                <div id="firstRunSpinner" style="margin-bottom:8px">◈ LOADING YOUR PLAYLISTS…</div>
+            </div>
+        </div>
+
+        <!-- manual fallback -->
+        <div style="padding:10px 22px;border-top:1px solid var(--border);flex-shrink:0">
+            <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);margin-bottom:6px;letter-spacing:1px">// OR PASTE A PLAYLIST ID / URL MANUALLY</div>
+            <div style="display:flex;gap:8px">
+                <input type="text" id="firstRunManualInput" class="sys-input"
+                    style="flex:1;margin:0;font-size:11px"
+                    placeholder="spotify:playlist:37i9dQZF1DX… or full URL">
+                <button onclick="firstRunConfirmManual()"
+                    style="padding:8px 16px;background:rgba(77,184,255,0.08);border:1px solid var(--quincy);color:var(--quincy);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);white-space:nowrap;transition:all 0.15s"
+                    onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
+                    onmouseout="this.style.background='rgba(77,184,255,0.08)';this.style.color='var(--quincy)'">USE THIS ⟶</button>
+            </div>
+        </div>
+
+        <!-- footer -->
+        <div style="padding:10px 22px 14px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);flex-shrink:0">
+            <button onclick="firstRunSkip()"
+                style="background:none;border:none;color:var(--dim);font-family:'Share Tech Mono';font-size:9px;cursor:pointer;letter-spacing:1px;transition:color 0.15s"
+                onmouseover="this.style.color='var(--text)'"
+                onmouseout="this.style.color='var(--dim)'">SKIP — I'LL SYNC MANUALLY</button>
+            <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim)" id="firstRunCount"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ PRESET MANAGER MODAL ═══ -->
+<div id="presetManagerOverlay" style="display:none;position:fixed;inset:0;background:rgba(1,3,6,0.85);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:4px;width:420px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(77,184,255,0.12)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--border)">
+            <span style="font-family:'Share Tech Mono';font-size:11px;letter-spacing:2px;color:var(--quincy)">// PLAYLIST PRESETS</span>
+            <button onclick="closePresetManager()" style="background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer;line-height:1">✕</button>
+        </div>
+        <div id="presetList" style="flex:1;overflow-y:auto;padding:10px 14px;min-height:60px"></div>
+        <div style="padding:12px 14px;border-top:1px solid var(--border)">
+            <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:8px">// ADD PRESET</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center">
+                <input type="text" id="newPresetName" class="sys-input"
+                    placeholder="Name (e.g. SUMMER HEAT)"
+                    style="font-size:11px;padding:7px 9px;margin-bottom:0">
+                <input type="text" id="newPresetId" class="sys-input"
+                    placeholder="Spotify playlist ID"
+                    style="font-size:11px;padding:7px 9px;margin-bottom:0">
+                <button onclick="addPreset()"
+                    style="padding:7px 14px;background:var(--quincy2);border:none;color:#fff;font-family:'Share Tech Mono';font-size:11px;cursor:pointer;border-radius:var(--radius);white-space:nowrap;transition:background 0.15s"
+                    onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
+                    onmouseout="this.style.background='var(--quincy2)';this.style.color='#fff'">+ ADD</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════ STATE ═══
 let currentId            = null;
@@ -1496,6 +1501,16 @@ let currentProgress = 0;
 let seekDragging    = false;
 let sseSource       = null;
 let progressTicker  = null;
+
+// ── DEBOUNCE — prevents vault search from spamming fetchVaultName every keystroke
+let _vaultDebounceTimer = null;
+function debouncedRenderVault() {
+    clearTimeout(_vaultDebounceTimer);
+    _vaultDebounceTimer = setTimeout(renderVault, 280);
+}
+
+// ── QUEUE LOAD GUARD — prevents parallel fetches from racing
+let _queueLoading = false;
 
 // ═══════════════════════════════════════════════════════════ UTILS ═══
 
@@ -2301,14 +2316,37 @@ async function silentVaultScore(trackId) {
         });
         if (!res.ok) return;
         const data = await res.json();
+        if (data.error || data.score === null) return;
+
+        // Abort if track changed while we were waiting
+        if (trackId !== currentId) return;
+
         // Update session log entry with the score
         const h = historyLog.find(x => x.id === trackId);
-        if (h && data.score !== null) {
+        if (h) {
             h.score   = data.score;
             h.verdict = data.verdict;
             h.method  = data.method || 'SILENT SCAN';
+            h.source  = 'auto';
             renderHistory();
+            updateSparkline();
         }
+
+        // Fix 1: Update the score badge on the player art — was only done in triggerScore
+        const vc = verdictClass(data.verdict);
+        const artScore = document.getElementById('npArtScore');
+        artScore.textContent = data.score + '%';
+        artScore.style.color = vc === 'resonance' ? 'var(--resonance)' :
+                               vc === 'locked'    ? 'var(--neon)'      :
+                               vc === 'adjacent'  ? 'var(--quincy)'    :
+                               vc === 'peripheral'? 'var(--chrome)'    :
+                               vc === 'clash'     ? 'var(--clash)'     : 'var(--bankai)';
+        artScore.style.display = 'block';
+
+        // Fix 2: Fire auto-add — was only called in triggerScore, so silent mode never triggered it
+        const trackObj = currentTrackObj;
+        maybeAutoAdd(trackId, data.score, trackObj ? trackObj.name : trackId);
+
     } catch(e) { /* silent fail */ }
 }
 
@@ -2349,6 +2387,7 @@ async function triggerScore(isManual = true) {
             histItem.score   = data.error ? null : data.score;
             histItem.method  = data.error ? data.error : data.method;
             histItem.verdict = data.error ? 'ERROR' : data.verdict;
+            histItem.source  = isManual ? 'manual' : 'auto';
             renderHistory();
         }
 
@@ -2590,7 +2629,7 @@ function handleNowPlaying(data) {
 }
 
 function startProgressTicker() {
-    stopProgressTicker();
+    if (progressTicker) return;   // already running — don't restart on every SSE event
     progressTicker = setInterval(() => {
         if (seekDragging || !isPlaying) return;
         currentProgress += 1000;
@@ -2636,6 +2675,18 @@ function startSSE() {
         } catch(err) { console.warn('[SSE] parse error', err); }
     });
 
+    // Lightweight progress-only event — same track still playing, just update seek bar
+    sseSource.addEventListener('progress', e => {
+        try {
+            const { progress_ms, duration_ms } = JSON.parse(e.data);
+            if (!seekDragging) {
+                currentProgress = progress_ms || 0;
+                currentDuration = duration_ms || currentDuration;
+                updateSeekUI(currentProgress, currentDuration);
+            }
+        } catch(err) {}
+    });
+
     // Ghost Signal Decryption — live status ticker
     sseSource.addEventListener('ghost_status', e => {
         try {
@@ -2647,11 +2698,19 @@ function startSSE() {
     // Reccobeats offline / system warnings
     sseSource.addEventListener('vault_updated', e => {
         try {
-            // Quietly refresh vault stats count so the header badge stays accurate
+            // Quietly refresh vault stats count so the header badge stays accurate.
+            // NOTE: d is {cached: N} from /api/vault_stats — NOT the vault array.
+            // Only update the count display; do NOT assign to vaultData (that's the full array).
             fetch('/api/vault_stats').then(r => r.json()).then(d => {
-                vault = d;
+                const count = d.cached || 0;
                 const el = document.getElementById('vaultCount');
-                if (el) el.textContent = d.cached || 0;
+                if (el) el.textContent = count;
+                // Also update the sidebar vault label and bar if visible
+                const total = Array.isArray(tracks) ? tracks.length : 0;
+                const lbl = document.getElementById('vaultLabel');
+                if (lbl) lbl.textContent = `VAULT: ${count} / ${total}`;
+                const bar = document.getElementById('vaultBar');
+                if (bar) bar.style.width = total ? `${Math.min(100,(count/total)*100)}%` : '0%';
             }).catch(() => {});
         } catch(err) {}
     });
@@ -2668,10 +2727,16 @@ function startSSE() {
     });
 
     sseSource.onerror = () => {
-        // SSE disconnected — retry after 5s with HTTP fallback
+        // SSE disconnected — activate HTTP poll fallback immediately so
+        // the player doesn't go dark, then retry SSE after 5s
         sseSource.close(); sseSource = null;
-        console.warn('[SSE] disconnected, retrying in 5s');
-        setTimeout(startSSE, 5000);
+        console.warn('[SSE] disconnected — activating HTTP poll fallback');
+        if (!pollTimer) poll();          // start fallback poll if not already running
+        setTimeout(() => {
+            clearTimeout(pollTimer);     // stop poll when SSE reconnects
+            pollTimer = null;
+            startSSE();
+        }, 5000);
     };
 }
 
@@ -3202,10 +3267,12 @@ async function runPlaylistAudit() {
 // ═══════════════════════════════════════════════════ QUEUE ANALYZER ═══
 
 async function loadQueue() {
+    if (_queueLoading) return;   // guard against parallel fetches
+    _queueLoading = true;
     const listEl  = document.getElementById('queueList');
     const statusEl = document.getElementById('queueStatus');
     const badge   = document.getElementById('queueBadge');
-    if (!listEl) return;
+    if (!listEl) { _queueLoading = false; return; }
 
     listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span> Fetching queue from Spotify…</div>';
     if (statusEl) statusEl.textContent = '';
@@ -3253,6 +3320,8 @@ async function loadQueue() {
 
     } catch(e) {
         listEl.innerHTML = '<div class="empty-state">Failed to fetch queue. Check Flask server.</div>';
+    } finally {
+        _queueLoading = false;
     }
 }
 
@@ -3614,8 +3683,9 @@ async function checkFirstRun(total) {
     if (total > 0) return;
     if (_firstRunShown) return;
     try { if (_store.getItem('ventus_onboarded') === '1') return; } catch(e) {}
-    _firstRunShown = true;
+    // Set flag AFTER showFirstRunPicker — if it throws, flag stays false so next call retries
     showFirstRunPicker();
+    _firstRunShown = true;
 }
 
 function showFirstRunPicker() {

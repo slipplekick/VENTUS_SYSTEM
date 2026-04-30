@@ -9,6 +9,7 @@ import sys
 import queue
 import threading
 import tempfile
+import statistics
 from datetime import datetime
 
 # ── LIBROSA (Ghost Signal local engine) ───────────────────────────────────────
@@ -192,7 +193,7 @@ def vault_insert(rows: list, source: str = 'reccobeats'):
                     VALUES (?,?,?,?,?,?,?,?,?,?,?)""", ghost_rows)
 
             if rb_rows:
-                # Only insert if no protected row exists for this id
+                # Fetch all protected IDs in a single query — not once per row
                 existing_protected = {r[0] for r in c.execute(
                     f"SELECT id FROM vault WHERE source IN ({','.join(['?']*len(PROTECTED))})",
                     list(PROTECTED)).fetchall()}
@@ -246,8 +247,19 @@ def get_camelot(key, mode):
 
 # ── TASTE PROFILE WEIGHTING ────────────────────────────────────────────────────
 def get_taste_profile():
+    csv_path = os.path.join(_HERE, 'master_vibe_training_set.csv')
+    # Fresh install — no CSV yet. Return {} so the frontend detects this as
+    # an empty profile and shows the first-run playlist picker overlay.
+    # Returning hardcoded fallback defaults here would make vibeProfile look
+    # populated and suppress the onboarding flow.
+    if not os.path.exists(csv_path):
+        return {}
     try:
-        df = pd.read_csv(os.path.join(_HERE, 'master_vibe_training_set.csv'))
+        df = pd.read_csv(csv_path)
+        # CSV exists but has no data rows (e.g. after wipe_profile) — also return {}
+        # so the frontend can show first-run picker again if needed.
+        if len(df) == 0:
+            return {}
         date_col = find_col(df, ['added at', 'date'])
         df['dt'] = pd.to_datetime(df[date_col], errors='coerce').fillna(
             pd.Timestamp(datetime(2020,1,1))) if date_col else pd.Timestamp(datetime(2020,1,1))
@@ -278,22 +290,40 @@ def get_taste_profile():
         }
     except Exception as ex:
         print(f"[WARN] get_taste_profile: {ex}")
+        # Only return fallback defaults if the CSV exists but is malformed —
+        # not on FileNotFoundError (that case is handled above).
         return {'energy':69.0,'valence':67.0,'dance':60.0,'bpm':120.0,
                 'acousticness':10.0,'instrumentalness':5.0,'loudness':-8.0}
 
-def get_spotify_token():
-    try:
-        r = requests.post(get_auth_url(), data={
-            "grant_type":    "refresh_token",
-            "refresh_token": REFRESH_TOKEN,
-            "client_id":     CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-        }, timeout=10)
-        token = r.json().get('access_token')
-        if not token: print(f"[ERROR] Token failed: {r.text}")
-        return token
-    except Exception as e:
-        print(f"[ERROR] Token exception: {e}"); return None
+# ── TOKEN CACHE — avoids a Spotify auth round-trip on every request ────────────
+# Spotify access tokens last 3600s. We refresh at 50 min (3000s) to stay safe.
+_token_cache: str | None = None
+_token_expires_at: float = 0.0
+_token_lock = threading.Lock()
+
+def get_spotify_token() -> str | None:
+    global _token_cache, _token_expires_at
+    with _token_lock:
+        if _token_cache and time.time() < _token_expires_at:
+            return _token_cache
+        try:
+            r = requests.post(get_auth_url(), data={
+                "grant_type":    "refresh_token",
+                "refresh_token": REFRESH_TOKEN,
+                "client_id":     CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+            }, timeout=10)
+            token = r.json().get('access_token')
+            if not token:
+                print(f"[ERROR] Token failed: {r.text}")
+                return None
+            _token_cache      = token
+            _token_expires_at = time.time() + 3000  # refresh at 50 min
+            print("[TOKEN] Refreshed Spotify access token", flush=True)
+            return token
+        except Exception as e:
+            print(f"[ERROR] Token exception: {e}")
+            return None
 
 TASTE_PROFILE = get_taste_profile()
 
@@ -334,9 +364,29 @@ _sse_clients = []
 _sse_lock    = threading.Lock()
 
 # ── FAILED TRACKS CACHE ───────────────────────────────────────────────────────
-# Tracks that returned no data from ReccoBeats AND failed Ghost Signal.
-# Prevents infinite retry loops — once a track is known-bad, skip all API calls.
+# Tracks that returned no data from all 5 tiers.
+# Persisted to disk so app restarts don't re-hammer the same dead tracks.
+_FAILED_TRACKS_FILE = os.path.join(_HERE, 'failed_tracks.json')
 FAILED_TRACKS: set = set()
+
+def _load_failed_tracks():
+    global FAILED_TRACKS
+    try:
+        if os.path.exists(_FAILED_TRACKS_FILE):
+            with open(_FAILED_TRACKS_FILE, 'r') as f:
+                FAILED_TRACKS = set(json.load(f))
+            print(f"[BOOT] Loaded {len(FAILED_TRACKS)} known-bad tracks from cache", flush=True)
+    except Exception as e:
+        print(f"[BOOT] failed_tracks load error (non-fatal): {e}")
+
+def _save_failed_tracks():
+    try:
+        with open(_FAILED_TRACKS_FILE, 'w') as f:
+            json.dump(list(FAILED_TRACKS), f)
+    except Exception as e:
+        print(f"[WARN] failed_tracks save: {e}")
+
+_load_failed_tracks()
 
 def _sse_broadcast(event_type, data):
     payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
@@ -585,7 +635,6 @@ def derive_from_audio_analysis(track_id: str, token: str) -> dict | None:
             beats = d.get('beats', [])
             if len(beats) > 1:
                 beat_durs = [beats[i+1]['start'] - beats[i]['start'] for i in range(len(beats)-1)]
-                import statistics
                 beat_var  = statistics.stdev(beat_durs) if len(beat_durs) > 1 else 1.0
                 dance     = min(100.0, max(0.0, 100 - beat_var * 200))
             else:
@@ -667,6 +716,7 @@ def resolve_features(track_id: str, token: str | None = None,
 
     # 7. All tiers exhausted — cache the failure to avoid future retries
     FAILED_TRACKS.add(track_id)
+    _save_failed_tracks()
     return None, "NO SIGNAL", "void"
 
 # ── PLAYLIST PAGINATION ───────────────────────────────────────────────────────
@@ -676,8 +726,19 @@ def fetch_playlist_tracks(playlist_id, token, fields=None):
     headers = {"Authorization":f"Bearer {token}"}
     items   = []
     while url:
-        res = requests.get(url, headers=headers, timeout=10)
-        if res.status_code != 200: raise ValueError(f"Spotify API error: {res.status_code}")
+        last_err = None
+        for attempt in range(3):
+            try:
+                res = requests.get(url, headers=headers, timeout=12)
+                if res.status_code == 200:
+                    break
+                last_err = f"Spotify API error: {res.status_code}"
+            except requests.RequestException as e:
+                last_err = str(e)
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+        else:
+            raise ValueError(last_err or "Playlist fetch failed after 3 attempts")
         body = res.json()
         items.extend(body.get('items',[]))
         url = body.get('next')
@@ -705,11 +766,14 @@ def _auto_vault_track(track_id: str, token: str):
 
 
 # ── NOW-PLAYING POLLER ────────────────────────────────────────────────────────
+# Polls every 3 seconds — correct for a live player.
+# Broadcasts a lightweight "progress" event when the same track is still playing
+# so the seek bar updates smoothly without triggering a full now_playing re-eval.
 def _now_playing_poller():
     last_id = None
     while True:
         try:
-            token = get_spotify_token()
+            token = get_spotify_token()   # uses cache — no auth hit every 3s
             if token:
                 res = requests.get(f"{get_api()}/me/player/currently-playing",
                                    headers={"Authorization":f"Bearer {token}"}, timeout=6)
@@ -719,25 +783,38 @@ def _now_playing_poller():
                         item   = body['item']
                         cid    = item['id']
                         images = item.get('album',{}).get('images',[])
-                        _sse_broadcast("now_playing",{
-                            "is_playing":True,"id":cid,"name":item['name'],
-                            "artist":item['artists'][0]['name'] if item.get('artists') else "Unknown",
-                            "album":item.get('album',{}).get('name',''),
-                            "album_art":images[0]['url'] if images else None,
-                            "progress_ms":body.get('progress_ms',0),
-                            "duration_ms":item.get('duration_ms',0),
-                            "track_changed":(cid!=last_id),
-                        })
                         track_changed = (cid != last_id)
-                        last_id = cid
-                        # Silently vault every new track using all 5 resolver tiers
+
                         if track_changed:
-                            threading.Thread(target=_auto_vault_track, args=(cid, token), daemon=True).start()
+                            # Full broadcast — new track, frontend needs all metadata
+                            _sse_broadcast("now_playing", {
+                                "is_playing":    True,
+                                "id":            cid,
+                                "name":          item['name'],
+                                "artist":        item['artists'][0]['name'] if item.get('artists') else "Unknown",
+                                "album":         item.get('album',{}).get('name',''),
+                                "album_art":     images[0]['url'] if images else None,
+                                "progress_ms":   body.get('progress_ms', 0),
+                                "duration_ms":   item.get('duration_ms', 0),
+                                "track_changed": True,
+                            })
+                            last_id = cid
+                            # Silently vault every new track using all 5 resolver tiers
+                            threading.Thread(target=_auto_vault_track,
+                                             args=(cid, token), daemon=True).start()
+                        else:
+                            # Same track — send lightweight progress-only event
+                            # so the seek bar stays accurate without full re-eval
+                            _sse_broadcast("progress", {
+                                "progress_ms": body.get('progress_ms', 0),
+                                "duration_ms": item.get('duration_ms', 0),
+                            })
                     else:
                         if last_id is not None:
-                            _sse_broadcast("now_playing",{"is_playing":False})
+                            _sse_broadcast("now_playing", {"is_playing": False})
                             last_id = None
-        except Exception as e: print(f"[SSE-POLL] {e}")
+        except Exception as e:
+            print(f"[SSE-POLL] {e}")
         time.sleep(3)
 
 threading.Thread(target=_now_playing_poller, daemon=True).start()
@@ -892,6 +969,7 @@ def wipe_profile():
         TASTE_PROFILE = get_taste_profile()
         # Clear failed-tracks cache — fresh slate for next sync
         FAILED_TRACKS.clear()
+        _save_failed_tracks()
         return jsonify({"success": True, "message": "TASTE PROFILE WIPED — ready for new sync."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1564,12 +1642,20 @@ def rebuild_dna():
              f"&artist={requests.utils.quote(str(row[a_col]))}"
              f"&track={requests.utils.quote(str(row[n_col]))}"
              f"&api_key={LFM_KEY}&format=json&autocorrect=1")
-        try:
-            for t in requests.get(url,timeout=5).json().get('toptags',{}).get('tag',[])[:10]:
-                n=t['name'].lower()
-                if n not in SKIP: tag_counts[n]=tag_counts.get(n,0)+1
-        except: pass
-        time.sleep(0.05)
+        for attempt in range(3):
+            try:
+                r = requests.get(url, timeout=6)
+                if r.status_code == 429:
+                    # Last.fm rate-limited — back off and retry
+                    time.sleep(3 * (attempt + 1))
+                    continue
+                for t in r.json().get('toptags',{}).get('tag',[])[:10]:
+                    n=t['name'].lower()
+                    if n not in SKIP: tag_counts[n]=tag_counts.get(n,0)+1
+                break
+            except Exception:
+                time.sleep(0.5)
+        time.sleep(0.08)   # polite baseline — well under Last.fm's 5 req/s limit
     dna=[tag for tag,c in tag_counts.items() if c>=2]
     with open(os.path.join(_HERE,'vibe_dna.json'),'w',encoding='utf-8') as f: json.dump(dna,f)
     return jsonify({"success":True,"tags":len(dna),"dna":dna,
@@ -1581,7 +1667,25 @@ def export_session():
     log=request.json or []
     if not log: return jsonify({"error":"Empty session log"}),400
     try:
-        return Response(pd.DataFrame(log).to_csv(index=False),mimetype='text/csv',
+        from datetime import datetime
+        rows=[]
+        for h in log:
+            ts=h.get('time')
+            try:
+                readable=datetime.fromtimestamp(int(ts)/1000).strftime('%Y-%m-%d %H:%M:%S') if ts else ''
+            except Exception:
+                readable=str(ts) if ts else ''
+            rows.append({
+                'time':    readable,
+                'name':    h.get('name',''),
+                'artist':  h.get('artist',''),
+                'score':   h.get('score',''),
+                'verdict': h.get('verdict',''),
+                'method':  h.get('method',''),
+                'source':  h.get('source','manual'),   # 'auto' for silent-scored, 'manual' otherwise
+                'id':      h.get('id',''),
+            })
+        return Response(pd.DataFrame(rows).to_csv(index=False),mimetype='text/csv',
                         headers={"Content-Disposition":"attachment; filename=ventus_session.csv"})
     except Exception as e: return jsonify({"error":str(e)}),500
 
