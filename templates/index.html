@@ -7,7 +7,7 @@
 <title>VENTUS // SYS</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════ DESIGN TOKENS ═══ */
+/* design tokens */
 :root {
     --void:      #010306;
     --deep:      #04080f;
@@ -51,14 +51,14 @@
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { font-size: 17px; scroll-behavior: smooth; }
 
-/* ── CUSTOM SCROLLBAR ── */
+/* scrollbar */
 ::-webkit-scrollbar              { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track        { background: transparent; }
 ::-webkit-scrollbar-thumb        { background: rgba(77,184,255,0.2); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover  { background: rgba(77,184,255,0.45); }
 ::-webkit-scrollbar-corner       { background: transparent; }
 
-/* ── CUSTOM TITLEBAR ── */
+/* titlebar */
 .titlebar {
     position: fixed; top: 0; left: 0; right: 0;
     height: 32px;
@@ -109,7 +109,7 @@ body {
     .profile-stat-val { font-size: 38px; }
 }
 
-/* ── SCANLINE OVERLAY ── */
+/* scanline overlay */
 body::before {
     content: '';
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -122,7 +122,7 @@ body::before {
     );
 }
 
-/* ── TOAST ── */
+/* toast */
 #toast {
     position: fixed; top: 22px; right: -480px; max-width: 400px;
     background: rgba(4,8,15,0.97); border-left: 3px solid var(--neon);
@@ -136,7 +136,7 @@ body::before {
 #toast.error { border-left-color: var(--bankai); }
 #toast.warn  { border-left-color: var(--chrome); }
 
-/* ── SIDEBAR ── */
+/* sidebar */
 .sidebar {
     position: fixed; left: 0; top: 0;
     width: var(--sidebar); height: 100%;
@@ -153,7 +153,7 @@ body::before {
     background: linear-gradient(90deg, var(--quincy2), var(--quincy), transparent);
 }
 
-/* ── LOGO ── */
+/* logo */
 .logo {
     padding: 24px 20px 20px;
     border-bottom: 1px solid var(--border);
@@ -187,7 +187,7 @@ body::before {
     50%     { opacity:0.3; box-shadow: none; }
 }
 
-/* ── NAV ── */
+/* nav */
 .nav { padding: 8px 0; overflow-y: auto; flex: 1; min-height: 0; }
 .nav-item {
     padding: 9px 20px; cursor: pointer; color: var(--dim);
@@ -232,7 +232,7 @@ body::before {
 }
 .sync-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-/* ── LIVE FEED (sidebar bottom) ── */
+/* live feed */
 .live-feed {
     border-top: 1px solid var(--border);
     padding: 14px 16px;
@@ -337,7 +337,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 .vault-bar-wrap { height: 1px; background: var(--dim2); border-radius: 1px; margin-top: 5px; }
 .vault-bar { height: 100%; background: rgba(77,184,255,0.4); border-radius: 1px; transition: width 0.6s; }
 
-/* ── MAIN ── */
+/* main */
 .main {
     margin-left: var(--sidebar);
     padding: 40px 50px;
@@ -361,7 +361,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .page-title span { color: var(--quincy); }
 
-/* ── SHARED INPUT ── */
+/* shared input */
 .sys-input {
     width: 100%; padding: 12px 16px;
     background: var(--panel); border: 1px solid var(--border2);
@@ -375,7 +375,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .sys-input::placeholder { color: var(--dim); }
 
-/* ── DASHBOARD ── */
+/* dashboard */
 .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
 .kpi {
     background: var(--panel); padding: 20px 22px;
@@ -445,7 +445,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .dna-tag:hover { background: rgba(77,184,255,0.14); border-color: var(--quincy); }
 
-/* ── LIST TABLES ── */
+/* list tables */
 .list-header {
     display: grid; padding: 9px 14px;
     font-family: 'Share Tech Mono'; font-size: 12px;
@@ -485,7 +485,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 .unrated    { color: var(--dim); font-family: 'Share Tech Mono'; font-size: 11px; }
 .standby    { color: var(--dim); font-family: 'Share Tech Mono'; font-size: 11px; }
 
-/* ── SCORER ── */
+/* scorer */
 .scorer-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
 
 .score-box {
@@ -589,7 +589,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 .compare-track-bar.amber { background: var(--chrome); }
 .compare-track-bar.red   { background: var(--bankai); box-shadow: 0 0 6px rgba(255,76,43,0.35); }
 
-/* ── DISCOVER ── */
+/* discover */
 .discover-search-row { display: flex; gap: 10px; margin-bottom: 16px; }
 .discover-search-row .sys-input { margin-bottom: 0; flex: 1; }
 .search-btn {
@@ -647,7 +647,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .neighbor-action:hover { background: rgba(77,184,255,0.1); border-color: var(--quincy); }
 
-/* ── HISTORY ── */
+/* history */
 .history-controls { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
 .history-clear-btn {
     padding: 9px 16px; background: none;
@@ -658,7 +658,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .history-clear-btn:hover { background: rgba(255,76,43,0.08); border-color: var(--bankai); }
 
-/* ── VAULT ── */
+/* vault */
 .vault-filter-row { display: flex; gap: 10px; margin-bottom: 16px; }
 .vault-filter-row .sys-input { margin-bottom: 0; flex: 1; }
 .filter-select {
@@ -669,7 +669,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .filter-select:focus { border-color: var(--quincy); }
 
-/* ── PLAYLIST INPUT ROW ── */
+/* playlist input */
 .playlist-input-row { display: flex; gap: 10px; margin-bottom: 20px; }
 .playlist-input-row .sys-input { margin-bottom: 0; flex: 1; }
 .load-btn {
@@ -681,7 +681,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .load-btn:hover { background: var(--quincy); color: var(--void); }
 
-/* ── SPINNER ── */
+/* spinner */
 .spinner {
     display: inline-block; width: 14px; height: 14px;
     border: 2px solid var(--dim2); border-top-color: var(--quincy);
@@ -690,14 +690,14 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── EMPTY STATE ── */
+/* empty state */
 .empty-state {
     padding: 40px; text-align: center; color: var(--dim);
     font-family: 'Share Tech Mono'; font-size: 13px;
     letter-spacing: 1px; line-height: 2;
 }
 
-/* ── VERDICT LEGEND ── */
+/* verdict legend */
 .verdict-legend {
     display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; margin-bottom: 4px;
 }
@@ -709,7 +709,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 }
 .legend-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-/* ── SCORER RADAR POLYGON STYLES ── */
+/* radar polygons */
 #scorerRadarSvg .radar-grid    { fill: none; stroke: rgba(77,184,255,0.15); stroke-width: 0.8; }
 #scorerRadarSvg .radar-axes line{ stroke: rgba(77,184,255,0.18); stroke-width: 0.7; }
 #scorerRadarSvg .radar-labels text { fill: rgba(168,212,255,0.55); font-family: 'Share Tech Mono'; font-size: 5px; }
@@ -717,7 +717,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 #scorerRadarSvg .radar-track   { fill: rgba(0,229,204,0.22); stroke: var(--neon); stroke-width: 1.5;
     transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
 
-/* ── SCORER MAIN PLANE (radar + score side by side) ── */
+/* scorer layout */
 .scorer-main-plane {
     display: flex;
     align-items: center;
@@ -753,7 +753,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
     height: 1px; background: var(--border); margin: 28px 0;
 }
 
-/* ── TRANSPORT DECK ── */
+/* transport */
 .transport-btn {
     flex: 1; padding: 8px 4px;
     background: rgba(77,184,255,0.05);
@@ -778,7 +778,7 @@ input:checked + .slider::before { transform: translateX(18px); background: var(-
 .transport-btn.active-state img.t-icon { filter: invert(80%) sepia(80%) saturate(500%) hue-rotate(130deg) brightness(1.4); }
 .transport-btn.repeat-track img.t-icon  { filter: invert(80%) sepia(80%) saturate(500%) hue-rotate(130deg) brightness(1.4); }
 
-/* ── SLIDER IMPROVEMENTS ── */
+/* sliders */
 input[type="range"].thick-slider {
     height: 5px !important;
     appearance: none; -webkit-appearance: none;
@@ -829,7 +829,7 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
 }
 
 
-/* ── SIGNALS PAGE ── */
+/* signals page */
 .signals-track-row, .signals-artist-row {
     display: flex; align-items: center; gap: 12px;
     padding: 9px 10px; border-radius: 4px; cursor: default;
@@ -881,7 +881,7 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
     color: var(--quincy) !important;
     background: rgba(77,184,255,0.08) !important;
 }
-/* ── AUDIT DIST BAR ── */
+/* audit dist bar */
 .audit-dist-seg {
     height: 8px; border-radius: 2px; transition: width 0.5s;
     position: relative; cursor: default;
@@ -1471,10 +1471,10 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════ STATE ═══
+// state
 let currentId            = null;
 let currentTrackObj      = null;
-// ── STORAGE SHIM — works in Electron where localStorage may be blocked ─────
+// storage shim - localStorage can be blocked in Electron
 const _memStore = {};
 const _store = {
     getItem:    (k) => { try { return localStorage.getItem(k); } catch(e) { return _memStore[k] ?? null; } },
@@ -1502,17 +1502,17 @@ let seekDragging    = false;
 let sseSource       = null;
 let progressTicker  = null;
 
-// ── DEBOUNCE — prevents vault search from spamming fetchVaultName every keystroke
+// debounce
 let _vaultDebounceTimer = null;
 function debouncedRenderVault() {
     clearTimeout(_vaultDebounceTimer);
     _vaultDebounceTimer = setTimeout(renderVault, 280);
 }
 
-// ── QUEUE LOAD GUARD — prevents parallel fetches from racing
+// queue load guard
 let _queueLoading = false;
 
-// ═══════════════════════════════════════════════════════════ UTILS ═══
+// utils
 
 function showToast(msg, type = 'ok') {
     const t = document.getElementById('toast');
@@ -1598,7 +1598,7 @@ function barClass(diff, tight = 15, loose = 30) {
     return 'red';
 }
 
-// ═══════════════════════════════════════════════════════════ NAV ═══
+// nav
 
 document.querySelectorAll('.nav-item').forEach(el => {
     el.addEventListener('click', () => showPage(el.dataset.page));
@@ -1633,7 +1633,7 @@ function showPage(p) {
     }
 }
 
-// ═══════════════════════════════════════════════════════════ RADAR (7-AXIS) ═══
+// radar (7-axis)
 
 const RADAR_CX = 50, RADAR_CY = 50, RADAR_R = 38;
 const RADAR_AXES = ['NRG','VAL','DNC','ACST','INST','LOUD','BPM'];
@@ -1690,7 +1690,7 @@ function buildDashRadar(profile) {
     document.getElementById('dashRadarProfile').setAttribute('points', heptPts(vals, RADAR_R));
 }
 
-// ═══════════════════════════════════════════ SCORER RADAR (7-AXIS) ═══
+// scorer radar
 
 const SR_CX = 50, SR_CY = 50, SR_R = 36;
 const SR_AXES = ['NRG','VAL','DNC','LOUD','BPM','ACST','INST'];
@@ -1733,7 +1733,7 @@ function buildScorerRadar(profileVals, trackVals) {
     }, 80);
 }
 
-// ═══════════════════════════════════════════════════════════ HISTOGRAM ═══
+// histogram
 
 function buildHistogram(containerId, values, buckets, min, max) {
     const step = (max - min) / buckets;
@@ -1753,7 +1753,7 @@ function buildHistogram(containerId, values, buckets, min, max) {
     }).join('');
 }
 
-// ═══════════════════════════════════════════════════════════ LOAD DATA ═══
+// load data
 
 async function loadData() {
     try {
@@ -1932,7 +1932,7 @@ function escHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ═══════════════════════════════════════════════════════════ VAULT ═══
+// vault
 
 // Lazily resolve track name/artist for vault-only entries (not in taste profile CSV).
 // Calls /api/track_info which does a single Spotify /tracks/{id} lookup.
@@ -2047,7 +2047,7 @@ function renderVault() {
     el.innerHTML = html || '<div class="empty-state">No matching records found.</div>';
 }
 
-// ═══════════════════════════════════════════════════════════ HISTORY ═══
+// history
 
 function renderHistory() {
     const badge = document.getElementById('historyBadge');
@@ -2094,7 +2094,7 @@ function clearHistory() {
     showToast('// SESSION LOG CLEARED', 'warn');
 }
 
-// ═══════════════════════════════════════════════════════════ DISCOVER ═══
+// discover
 
 function renderNeighbors(features) {
     if (!features || !tracks.length) return;
@@ -2225,7 +2225,7 @@ async function scoreDiscoverTrack(trackId, cardEl) {
     }
 }
 
-// ═══════════════════════════════════════════════════════════ SYNC ═══
+// sync
 
 async function syncMasterPlaylist() {
     const playlistId = await customPrompt(
@@ -2261,7 +2261,7 @@ async function syncMasterPlaylist() {
     }
 }
 
-// ═══════════════════════════════════════════════════════════ SCORER ═══
+// scorer
 
 // autoAnalyzeEnabled = true  → triggers full scorer UI + auto-add on each track change
 // autoAnalyzeEnabled = false → silent background vault-score only (no UI, no auto-add)
@@ -2554,7 +2554,7 @@ async function triggerScore(isManual = true) {
     }
 }
 
-// ═══════════════════════════════════════════════════════════ SSE / LIVE FEED ═══
+// SSE / live feed
 
 function handleNowPlaying(data) {
     if (data.is_playing) {
@@ -2740,7 +2740,7 @@ function startSSE() {
     };
 }
 
-// ── GHOST / SYSTEM STATUS BANNER ─────────────────────────────────
+// ghost / system status banner
 let _ghostBannerTimer = null;
 function showGhostStatusBanner(msg, type = 'ghost') {
     let banner = document.getElementById('ghostStatusBanner');
@@ -2779,7 +2779,7 @@ async function poll() {
     }
 }
 
-// ═══════════════════════════════════════════════════════ TRANSPORT DECK ═══
+// transport deck
 
 async function sendPlayback(action, body = {}) {
     try {
@@ -2902,7 +2902,7 @@ async function switchDevice(deviceId) {
     } catch(e) { showToast('// TRANSFER ERROR', 'error'); }
 }
 
-// ═══════════════════════════════════════════════════════ SPARKLINE ═══
+// sparkline
 
 function updateSparkline() {
     const scored = historyLog.filter(h => h.score !== null).slice(0, 20).reverse();
@@ -2919,8 +2919,8 @@ function updateSparkline() {
     document.getElementById('sparklineRef').setAttribute('y2', refY);
 }
 
-// ═══════════════════════════════════════════════════ PLAYLIST PRESET ═══
-// ═══════════════════════════════════════════════════ PRESET MANAGER ═══
+// playlist preset
+// preset manager
 
 const PRESET_DEFAULT = [
     { name: '◈ TRACK VAULT', id: '1rxvJh0wWgia4ylocdC42Y', locked: true }
@@ -3053,7 +3053,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.style.display === 'flex') closePresetManager(); });
 });
 
-// ═══════════════════════════════════════════════════════ AUTO-ADD ═══
+// auto-add
 
 async function maybeAutoAdd(trackId, score, trackName) {
     const toggle = document.getElementById('autoAddToggle');
@@ -3082,7 +3082,7 @@ async function maybeAutoAdd(trackId, score, trackName) {
     }
 }
 
-// ═══════════════════════════════════════════════════ VAULT SYNC ═══
+// vault sync
 // Auto-adder #1: syncs your playlist tracks into the vault
 
 async function syncVaultFromPlaylist() {
@@ -3117,7 +3117,7 @@ async function syncVaultFromPlaylist() {
     }
 }
 
-// ═══════════════════════════════════════════════════ EXPORT SESSION ═══
+// export session
 
 async function exportSessionLog() {
     if (!historyLog.length) {
@@ -3144,7 +3144,7 @@ async function exportSessionLog() {
     }
 }
 
-// ═══════════════════════════════════════════════════ REFRESH GENRES ═══
+// refresh genres
 
 async function rebuildDna() {
     const btn = document.getElementById('rebuildDnaBtn');
@@ -3172,7 +3172,7 @@ async function rebuildDna() {
     }
 }
 
-// ═══════════════════════════════════════════════════ PLAYLIST AUDIT ═══
+// playlist audit
 
 async function runPlaylistAudit() {
     const pid = document.getElementById('auditPlaylistId').value.trim();
@@ -3264,7 +3264,7 @@ async function runPlaylistAudit() {
     }
 }
 
-// ═══════════════════════════════════════════════════ QUEUE ANALYZER ═══
+// queue analyzer
 
 async function loadQueue() {
     if (_queueLoading) return;   // guard against parallel fetches
@@ -3326,7 +3326,7 @@ async function loadQueue() {
 }
 
 
-// ════════════════════════════════════════════════ SIGNALS PAGE ════
+// signals page
 let signalsRange   = 'short_term';
 let signalsLoaded  = false;
 
@@ -3424,7 +3424,7 @@ function setSignalsRange(btn, range) {
     btn.classList.add('active-range');
     loadSignals(range);
 }
-// ═══════════════════════════════════════ ICON SYSTEM ═══
+// icon system
 // Loads SVG icons from assets/icons/ if available, falls back to emoji
 const ICON_EMOJIS = { prev:'⏮', play:'▶', pause:'⏸', next:'⏭', shuffle:'⇌', repeat:'↺', repeat1:'↺¹' };
 const ICON_FILES  = { prev:'prev.png', play:'play.png', pause:'pause.png', next:'next.png', shuffle:'shuffle.png', repeat:'repeat.png', repeat1:'repeat-one.png' };
@@ -3491,7 +3491,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ═══════════════════════════════════════════ CUSTOM PROMPT MODAL ═══
+// custom prompt modal
 // Replaces all native prompt() calls — works in Electron where prompt() is blocked.
 // Returns a Promise that resolves with the entered string, or null if cancelled.
 function customPrompt(title = 'INPUT REQUIRED', label = 'Enter value', placeholder = '') {
@@ -3533,7 +3533,7 @@ function customPrompt(title = 'INPUT REQUIRED', label = 'Enter value', placehold
     });
 }
 
-// ═══════════════════════════════════════════ WIPE TASTE PROFILE ═══
+// wipe taste profile
 async function wipeProfile() {
     const confirm = await customPrompt(
         '✕ WIPE TASTE PROFILE',
@@ -3638,7 +3638,7 @@ function rescanGhosts() {
 }
 
 
-// ═══════════════════════════════ AUTO-ADD PRESET PERSISTENCE ═══
+// auto-add preset persistence
 // Save the selected preset + custom ID on any change so they survive restarts.
 function saveAutoAddState() {
     const sel = document.getElementById('autoAddPlaylistPreset');
@@ -3675,7 +3675,7 @@ function restoreAutoAddState() {
     }
 }
 
-// ═══════════════════════════════ FIRST-RUN DETECTION ═══
+// first-run detection
 // Called inside loadData() after the track count is known.
 let _firstRunShown = false;  // in-memory flag — works in Electron where localStorage may be blocked
 
@@ -3823,7 +3823,7 @@ async function _firstRunSync(playlistId, wipeFirst = false) {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+
 loadData();
 startSSE();
 refreshDevices();

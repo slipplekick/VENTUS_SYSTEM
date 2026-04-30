@@ -12,7 +12,7 @@ import tempfile
 import statistics
 from datetime import datetime
 
-# ── LIBROSA (Ghost Signal local engine) ───────────────────────────────────────
+# librosa init (ghost signal local engine)
 try:
     import librosa
     import numpy as np
@@ -22,19 +22,19 @@ except ImportError:
     LIBROSA_OK = False
     print("[BOOT] librosa NOT installed — Ghost Signal DISABLED (pip install librosa to enable)")
 
-# ── ENCODING FIX ──────────────────────────────────────────────────────────────
+# fix stdout encoding on windows
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-# ── PYINSTALLER PATH FIX ──────────────────────────────────────────────────────
+# resolve base path when running as pyinstaller bundle
 if getattr(sys, 'frozen', False):
     _HERE = sys._MEIPASS
 else:
     _HERE = os.path.dirname(os.path.abspath(__file__))
 
-# ── LOAD .env SECRETS ─────────────────────────────────────────────────────────
+# load credentials from .env
 try:
     from dotenv import load_dotenv
     load_dotenv(os.path.join(_HERE, '.env'))
@@ -47,7 +47,7 @@ app = Flask(__name__,
             static_folder=os.path.join(_HERE, 'assets'),
             static_url_path='/assets')
 
-# ── CREDENTIALS ───────────────────────────────────────────────────────────────
+# credentials
 CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "")
 CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 REFRESH_TOKEN = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
@@ -56,11 +56,7 @@ LFM_KEY       = os.environ.get("LFM_KEY",               "")
 def get_auth_url(): return "https://accounts.s" + "potify.com/api/token"
 def get_api():      return "https://api.s"       + "potify.com/v1"
 
-# ══════════════════════════════════════════════════════════════════════════════
-# SQLITE VAULT  —  replaces vibe_vault.csv
-# WAL journal mode allows concurrent reads from SSE thread + request threads
-# without locking. INSERT OR REPLACE handles upserts safely.
-# ══════════════════════════════════════════════════════════════════════════════
+# sqlite vault - WAL mode for concurrent reads, upserts via INSERT OR REPLACE
 DB_FILE = os.path.join(_HERE, 'vibe_vault.db')
 
 def _db():
@@ -220,7 +216,7 @@ def vault_all_as_df() -> pd.DataFrame:
             return pd.read_sql("SELECT * FROM vault", c)
     except: return pd.DataFrame()
 
-# ── HELPERS ───────────────────────────────────────────────────────────────────
+# helpers
 def find_col(df, keys, exclude=None):
     """
     Return the first column whose lowercased name contains any of `keys`.
@@ -245,7 +241,7 @@ def get_camelot(key, mode):
     minors = ["5A","12A","7A","2A","9A","4A","11A","6A","1A","8A","3A","10A"]
     return majors[k] if m == 1 else minors[k]
 
-# ── TASTE PROFILE WEIGHTING ────────────────────────────────────────────────────
+# taste profile
 def get_taste_profile():
     csv_path = os.path.join(_HERE, 'master_vibe_training_set.csv')
     # Fresh install — no CSV yet. Return {} so the frontend detects this as
@@ -295,7 +291,7 @@ def get_taste_profile():
         return {'energy':69.0,'valence':67.0,'dance':60.0,'bpm':120.0,
                 'acousticness':10.0,'instrumentalness':5.0,'loudness':-8.0}
 
-# ── TOKEN CACHE — avoids a Spotify auth round-trip on every request ────────────
+# token cache - refresh at 50min to avoid hammering auth on every request
 # Spotify access tokens last 3600s. We refresh at 50 min (3000s) to stay safe.
 _token_cache: str | None = None
 _token_expires_at: float = 0.0
@@ -327,7 +323,7 @@ def get_spotify_token() -> str | None:
 
 TASTE_PROFILE = get_taste_profile()
 
-# ── SCORING ───────────────────────────────────────────────────────────────────
+# scoring
 def score_features(data):
     p = TASTE_PROFILE
     def nl(db):      return max(0,min(100,((db+30)/30)*100))
@@ -359,11 +355,11 @@ def score_features(data):
         "Loudness":round(dl,1),"BPM":round(db,1),
     }
 
-# ── SSE  (defined before Reccobeats so it can broadcast warnings) ─────────────
+# SSE - defined early so reccobeats fetch can broadcast warnings
 _sse_clients = []
 _sse_lock    = threading.Lock()
 
-# ── FAILED TRACKS CACHE ───────────────────────────────────────────────────────
+# failed tracks - persisted so restarts don't retry known-dead IDs
 # Tracks that returned no data from all 5 tiers.
 # Persisted to disk so app restarts don't re-hammer the same dead tracks.
 _FAILED_TRACKS_FILE = os.path.join(_HERE, 'failed_tracks.json')
@@ -397,7 +393,7 @@ def _sse_broadcast(event_type, data):
             except: dead.append(q)
         for q in dead: _sse_clients.remove(q)
 
-# ── RECCOBEATS ────────────────────────────────────────────────────────────────
+# reccobeats
 # ReccoBeats returns audio features for up to 40 Spotify track IDs per call.
 # The response items do NOT echo back the Spotify ID directly — each item
 # contains an 'href' field whose last path segment IS the Spotify track ID.
@@ -463,7 +459,7 @@ def fetch_reccobeats_batch(tids):
 def fetch_reccobeats(tid):
     return fetch_reccobeats_batch([tid]).get(tid)
 
-# ── GHOST SIGNAL DECRYPTION ───────────────────────────────────────────────────
+# ghost signal - local librosa fallback
 def _gs(msg:str):
     _sse_broadcast("ghost_status",{"message":msg})
     print(f"[GHOST] {msg}",flush=True)
@@ -555,7 +551,7 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
             try: os.remove(audio_path)
             except: pass
 
-# ── SPOTIFY AUDIO-FEATURES DIRECT (fallback tier 2) ──────────────────────────
+# spotify audio-features fallback (tier 2)
 def fetch_spotify_audio_features(track_id: str, token: str) -> dict | None:
     """
     Call Spotify /audio-features/{id} directly — bypasses ReccoBeats entirely.
@@ -590,7 +586,7 @@ def fetch_spotify_audio_features(track_id: str, token: str) -> dict | None:
         print(f"[SPOTIFY-AF] exception: {e}"); return None
 
 
-# ── SPOTIFY AUDIO-ANALYSIS DERIVE (fallback tier 3, nuclear) ─────────────────
+# spotify audio-analysis derive (tier 3, last resort before librosa)
 def derive_from_audio_analysis(track_id: str, token: str) -> dict | None:
     """
     Use Spotify /audio-analysis/{id} (full low-level acoustic data) to
@@ -664,7 +660,7 @@ def derive_from_audio_analysis(track_id: str, token: str) -> dict | None:
         print(f"[AUDIO-ANALYSIS] exception: {e}"); return None
 
 
-# ── SHARED 5-TIER RESOLVER ────────────────────────────────────────────────────
+# 5-tier resolver
 def resolve_features(track_id: str, token: str | None = None,
                      allow_ghost: bool = True) -> tuple:
     """
@@ -719,7 +715,7 @@ def resolve_features(track_id: str, token: str | None = None,
     _save_failed_tracks()
     return None, "NO SIGNAL", "void"
 
-# ── PLAYLIST PAGINATION ───────────────────────────────────────────────────────
+# playlist pagination
 def fetch_playlist_tracks(playlist_id, token, fields=None):
     default_fields = "items(item(id,name,artists,album(images)),track(id,name,artists,album(images))),next"
     url     = f"{get_api()}/playlists/{playlist_id}/items?fields={fields or default_fields}&limit=100"
@@ -744,7 +740,7 @@ def fetch_playlist_tracks(playlist_id, token, fields=None):
         url = body.get('next')
     return items
 
-# ── BACKGROUND AUTO-VAULT THREAD ──────────────────────────────────────────────
+# background vault thread
 # Silently resolves features for the currently-playing track every time it
 # changes. Vaults the result so it's available instantly for scoring.
 _last_auto_vaulted: str | None = None
@@ -765,7 +761,7 @@ def _auto_vault_track(track_id: str, token: str):
         _sse_broadcast("vault_updated", {"track_id": track_id, "method": method})
 
 
-# ── NOW-PLAYING POLLER ────────────────────────────────────────────────────────
+# now-playing poller
 # Polls every 3 seconds — correct for a live player.
 # Broadcasts a lightweight "progress" event when the same track is still playing
 # so the seek bar updates smoothly without triggering a full now_playing re-eval.
@@ -819,7 +815,7 @@ def _now_playing_poller():
 
 threading.Thread(target=_now_playing_poller, daemon=True).start()
 
-# ── BACKGROUND PLAYLIST AUTO-SYNC ────────────────────────────────────────────
+# background playlist auto-sync
 _autosync_playlist_id: str | None = None
 _autosync_interval:    int        = 300  # seconds (5 min default)
 
@@ -902,9 +898,7 @@ def _playlist_autosync_worker():
 
 threading.Thread(target=_playlist_autosync_worker, daemon=True).start()
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ROUTES
-# ══════════════════════════════════════════════════════════════════════════════
+# routes
 
 @app.route('/')
 def home():
@@ -1042,7 +1036,7 @@ def get_tracks():
         })
     return jsonify(out)
 
-# ── SCORE TRACK ───────────────────────────────────────────────────────────────
+# score track
 @app.route('/api/score_track', methods=['POST'])
 def score_track():
     t_id = (request.json or {}).get('track_id')
@@ -1065,7 +1059,7 @@ def score_track():
         "deltas":deltas,
     })
 
-# ── AUDIT PLAYLIST — all 3 tiers per track ───────────────────────────────────
+# audit playlist
 @app.route('/api/audit_playlist', methods=['POST'])
 def audit_playlist():
     playlist_id = (request.json or {}).get('playlist_id','').strip()
@@ -1122,7 +1116,7 @@ def audit_playlist():
                     "score":None,"verdict":"NO MATCH","source":"ghost"})
     return jsonify(results)
 
-# ── SYNC PLAYLIST → MASTER CSV ────────────────────────────────────────────────
+# sync playlist to master csv
 @app.route('/api/sync_playlist', methods=['POST'])
 def sync_playlist():
     playlist_id = (request.json or {}).get('playlist_id','').strip()
@@ -1228,7 +1222,7 @@ def sync_playlist():
             "message":f"SYNC COMPLETE — {len(new_rows)} new track(s) added. {len(ghost_ids)} ghost tracks resolving in background."})
     return jsonify({"success":True,"added":0,"message":"SIGNAL ALIGNED — no new tracks detected."})
 
-# ── SYNC VAULT FROM PLAYLIST ──────────────────────────────────────────────────
+# sync vault from playlist
 @app.route('/api/sync_vault_from_playlist', methods=['POST'])
 def sync_vault_from_playlist():
     playlist_id=(request.json or {}).get('playlist_id','').strip()
@@ -1259,7 +1253,7 @@ def sync_vault_from_playlist():
         "total_scanned":len(all_items),
         "message":f"VAULT SYNC COMPLETE — {added} new, {ghosted} deep scans, {already} already indexed."})
 
-# ── NOW PLAYING HTTP FALLBACK ─────────────────────────────────────────────────
+# now playing http fallback
 @app.route('/api/now_playing')
 def now_playing():
     token=get_spotify_token()
@@ -1279,7 +1273,7 @@ def now_playing():
     except Exception as e: print(f"[WARN] now_playing: {e}")
     return jsonify({"is_playing":False})
 
-# ── SEARCH ────────────────────────────────────────────────────────────────────
+# search
 @app.route('/api/search_spotify', methods=['POST'])
 def search_spotify():
     query=(request.json or {}).get('query','').strip()
@@ -1301,7 +1295,7 @@ def search_spotify():
         return jsonify(results)
     except Exception as e: return jsonify({"error":str(e)}),500
 
-# ── QUEUE — full 4-tier resolution ───────────────────────────────────────────
+# queue
 @app.route('/api/queue')
 def get_queue():
     token=get_spotify_token()
@@ -1350,7 +1344,7 @@ def get_queue():
         })
     return jsonify(results)
 
-# ── ADD TO PLAYLIST ───────────────────────────────────────────────────────────
+# add to playlist
 SESSION_ADDED_TRACKS=set()
 
 @app.route('/api/add_to_playlist', methods=['POST'])
@@ -1402,7 +1396,7 @@ def add_to_playlist():
         return jsonify({"error":f"Spotify returned {ar.status_code}"}),400
     except Exception as e: return jsonify({"error":str(e)}),500
 
-# ── TRACK INFO (single track name/artist lookup for vault display) ────────────
+# track info - single lookup for vault display
 @app.route('/api/track_info')
 def track_info():
     tid = request.args.get('id', '').strip()
@@ -1661,7 +1655,7 @@ def rebuild_dna():
     return jsonify({"success":True,"tags":len(dna),"dna":dna,
                     "message":f"GENRE PROFILE REBUILT — {len(dna)} genre triggers extracted."})
 
-# ── EXPORT SESSION ────────────────────────────────────────────────────────────
+# export session
 @app.route('/api/export_session', methods=['POST'])
 def export_session():
     log=request.json or []
@@ -1689,7 +1683,7 @@ def export_session():
                         headers={"Content-Disposition":"attachment; filename=ventus_session.csv"})
     except Exception as e: return jsonify({"error":str(e)}),500
 
-# ── PLAYBACK ──────────────────────────────────────────────────────────────────
+# playback controls
 @app.route('/api/playback/<action>', methods=['POST'])
 def playback_control(action):
     token=get_spotify_token()
@@ -1719,7 +1713,7 @@ def playback_control(action):
         return jsonify({"error":"Invalid action"}),400
     return jsonify({"success":res.status_code in[204,200]})
 
-# ── DEVICES ───────────────────────────────────────────────────────────────────
+# devices
 @app.route('/api/devices')
 def get_devices():
     token=get_spotify_token()
@@ -1746,7 +1740,7 @@ def transfer_playback():
         return jsonify({"success":res.status_code in[204,200]})
     except Exception as e: return jsonify({"error":str(e)}),500
 
-# ── PLAYER STATE (shuffle, repeat, volume) ───────────────────────────────────
+# player state
 @app.route('/api/player_state')
 def player_state():
     token = get_spotify_token()
@@ -1802,7 +1796,7 @@ def get_top():
         return jsonify(out)
     except Exception as e: return jsonify({"error":str(e)}),500
 
-# ── PLAYLIST AUTO-SYNC CONTROL ────────────────────────────────────────────────
+# playlist auto-sync
 @app.route('/api/set_autosync', methods=['POST'])
 def set_autosync():
     global _autosync_playlist_id, _autosync_interval
@@ -1826,7 +1820,7 @@ def autosync_status():
         "interval_seconds": _autosync_interval,
     })
 
-# ── USER PLAYLISTS ────────────────────────────────────────────────────────────
+# user playlists
 @app.route('/api/user_playlists')
 def user_playlists():
     """
@@ -1861,7 +1855,7 @@ def user_playlists():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ── BOOT ──────────────────────────────────────────────────────────────────────
+# boot
 if __name__ == '__main__':
     import socket
     # Electron passes VENTUS_PORT=0 to get a free port, or a specific port.
