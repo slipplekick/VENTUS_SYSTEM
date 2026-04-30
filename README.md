@@ -1,6 +1,6 @@
 # VENTUS//SYS
 
-Spotify-connected dashboard that scores tracks against your own taste profile. Built it because I was tired of Spotify's algorithm pushing stuff that had nothing to do with what I actually listen to. This doesn't suggest tracks — it just tells you how well something fits *your* profile before you hear it.
+Spotify-connected dashboard that scores tracks against your own taste profile. This doesn't suggest tracks, it just tells you how well something fits *your* profile before you hear it.
 
 It scores on energy, valence, danceability, BPM, key and a few other axes, all weighted against a profile built from your own playlists. If a track has no data anywhere, it downloads the 30s preview and runs local audio analysis on it (librosa). Everything gets cached in a local SQLite vault that gets faster the more you use it. There's also a Last.fm integration for genre fingerprinting if you want it.
 
