@@ -1722,6 +1722,41 @@ def autosync_status():
         "interval_seconds": _autosync_interval,
     })
 
+# ── USER PLAYLISTS ────────────────────────────────────────────────────────────
+@app.route('/api/user_playlists')
+def user_playlists():
+    """
+    Returns the current user's Spotify playlists (owned + followed).
+    Uses GET /me/playlists with pagination to fetch up to 200 playlists.
+    Each item: { id, name, track_count, image_url, owner }
+    """
+    token = get_spotify_token()
+    if not token:
+        return jsonify({"error": "Spotify auth failed"}), 401
+    try:
+        playlists = []
+        url = f"{get_api()}/me/playlists?limit=50"
+        while url and len(playlists) < 200:
+            res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+            if res.status_code != 200:
+                return jsonify({"error": f"Spotify error {res.status_code}"}), res.status_code
+            body = res.json()
+            for item in body.get('items', []):
+                if not item:
+                    continue
+                images = item.get('images') or []
+                playlists.append({
+                    'id':          item['id'],
+                    'name':        item.get('name', 'Untitled'),
+                    'track_count': item.get('tracks', {}).get('total', 0),
+                    'image_url':   images[0]['url'] if images else None,
+                    'owner':       item.get('owner', {}).get('display_name', ''),
+                })
+            url = body.get('next')
+        return jsonify(playlists)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ── BOOT ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     import socket
