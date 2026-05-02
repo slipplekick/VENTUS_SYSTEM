@@ -946,7 +946,6 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
     </div>
 
     <button class="sync-btn" id="syncBtn" onclick="syncMasterPlaylist()">⟳ SYNC TASTE PROFILE</button>
-    <button class="sync-btn" id="vaultSyncBtn" style="margin-top:0" onclick="syncVaultFromPlaylist()">◈ SYNC VAULT FROM PLAYLIST</button>
     <button class="sync-btn" style="margin-top:0;border-color:rgba(77,184,255,0.25);color:var(--dim)" onclick="showFirstRunPicker()" title="Browse your Spotify playlists and switch taste profile source">⊕ CHANGE PROFILE PLAYLIST</button>
     <button class="sync-btn" id="wipeProfileBtn" style="margin-top:0;border-color:rgba(255,76,43,0.35);color:var(--bankai)" onclick="wipeProfile()">✕ WIPE TASTE PROFILE</button>
 
@@ -1106,20 +1105,20 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
         <div class="section-div"></div>
         <div class="chart-title">// VERDICT SPECTRUM — SCORE ALIGNMENT</div>
         <div class="verdict-legend">
-            <div class="legend-item"><div class="legend-dot" style="background:var(--resonance)"></div>PERFECT MATCH [90–100] · Closest to your taste profile</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--neon)"></div>STRONG MATCH [75–89] · Core identity match</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--quincy)"></div>ALIGNED [58–74] · Fits the flow, minor variance</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--chrome)"></div>PERIPHERAL [40–57] · Present but doesn't fully commit</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--clash)"></div>DISSONANT [20–39] · Significant deviation</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--resonance)"></div>CORE [85–100] · Closest to your taste profile</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--quincy)"></div>ALIGNED [65–84] · Fits the flow, minor variance</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--chrome)"></div>FRINGE [45–64] · Present but doesn't fully commit</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--clash)"></div>OUTLIER [25–44] · Significant deviation</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--dim)"></div>NO MATCH [0–24] · Diverges from your profile</div>
             <div class="legend-item"><div class="legend-dot" style="background:var(--bankai)"></div>NO MATCH [0–19] · Total misalignment</div>
         </div>
         <div class="chart-title" style="margin-top:20px">// TIER SYSTEM — SCORE PROXIMITY RANK</div>
         <div class="verdict-legend">
             <div class="legend-item"><div class="legend-dot" style="background:var(--resonance)"></div>APEX · Score ≥ 90 · Closest to your taste profile</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--neon)"></div>CORE · Score 75–89 · Defines your sound</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--quincy)"></div>ALIGNED · Score 58–74 · Compatible with your profile</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--chrome)"></div>FRINGE · Score 40–57 · Borderline fit</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--bankai)"></div>OUTLIER · Score &lt;40 · Diverges from your profile</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--resonance)"></div>CORE · Score 85–100 · Defines your sound</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--quincy)"></div>ALIGNED · Score 65–84 · Compatible with your profile</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--chrome)"></div>FRINGE · Score 45–64 · Borderline fit</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--bankai)"></div>OUTLIER · Score 25–44 · Diverges from your profile</div>
         </div>
     </div>
 
@@ -1158,6 +1157,35 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
                 style="white-space:nowrap;padding:7px 13px;background:rgba(77,184,255,0.06);border:1px solid rgba(77,184,255,0.3);color:var(--quincy);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);letter-spacing:0.5px;transition:all 0.15s"
                 onmouseover="this.style.borderColor='var(--quincy)';this.style.background='rgba(77,184,255,0.14)';this.style.color='var(--sovereign)'"
                 onmouseout="this.style.borderColor='rgba(77,184,255,0.3)';this.style.background='rgba(77,184,255,0.06)';this.style.color='var(--quincy)'">◈ RESCAN GHOSTS</button>
+            <button onclick="openMasterVault()"
+                style="white-space:nowrap;padding:7px 13px;background:rgba(77,184,255,0.06);border:1px solid var(--border2);color:var(--dim);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);letter-spacing:0.5px;transition:all 0.15s"
+                onmouseover="this.style.borderColor='var(--quincy)';this.style.color='var(--text)';this.style.background='rgba(77,184,255,0.12)'"
+                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--dim)';this.style.background='rgba(77,184,255,0.06)'">⬡ MASTER VAULT</button>
+        </div>
+        <!-- vibe filter row: threshold inputs -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:1px;white-space:nowrap">// FILTER</span>
+            <input type="number" id="filterMinScore" placeholder="MIN SCORE" min="0" max="100"
+                class="sys-input" style="width:100px;font-size:10px;padding:5px 8px;margin-bottom:0"
+                oninput="renderVault()" title="Minimum vibe score (0-100)">
+            <input type="number" id="filterMinEnergy" placeholder="MIN NRG" min="0" max="100"
+                class="sys-input" style="width:88px;font-size:10px;padding:5px 8px;margin-bottom:0"
+                oninput="renderVault()" title="Minimum energy (0-100)">
+            <input type="number" id="filterMinValence" placeholder="MIN VAL" min="0" max="100"
+                class="sys-input" style="width:88px;font-size:10px;padding:5px 8px;margin-bottom:0"
+                oninput="renderVault()" title="Minimum valence (0-100)">
+            <input type="number" id="filterMinDance" placeholder="MIN DNC" min="0" max="100"
+                class="sys-input" style="width:88px;font-size:10px;padding:5px 8px;margin-bottom:0"
+                oninput="renderVault()" title="Minimum danceability (0-100)">
+            <button onclick="exportFilteredVault()"
+                style="white-space:nowrap;padding:5px 12px;background:rgba(77,184,255,0.06);border:1px solid var(--border2);color:var(--dim);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius);transition:all 0.15s"
+                onmouseover="this.style.borderColor='var(--quincy)';this.style.color='var(--text)'"
+                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--dim)'"
+                title="Export filtered results as CSV">⬇ EXPORT FILTERED</button>
+            <button onclick="clearVaultFilters()"
+                style="white-space:nowrap;padding:5px 10px;background:none;border:1px solid rgba(255,255,255,0.08);color:var(--dim);font-family:'Share Tech Mono';font-size:10px;cursor:pointer;border-radius:var(--radius)"
+                title="Clear all threshold filters">✕ CLEAR</button>
+            <span id="vaultFilterCount" style="font-family:'Share Tech Mono';font-size:9px;color:var(--quincy)"></span>
         </div>
         <div id="rescanLog" style="display:none;background:rgba(0,0,0,0.5);border:1px solid var(--quincy);margin:8px 0;padding:10px 14px;font-size:10px;color:var(--quincy);font-family:var(--mono);max-height:160px;overflow-y:auto;line-height:1.7"></div>
         <div class="list-header" style="grid-template-columns: 44px 1fr 90px 68px 68px 68px 68px 92px;">
@@ -1454,18 +1482,23 @@ input[type="range"].thick-slider::-webkit-slider-thumb:hover {
         <div id="presetList" style="flex:1;overflow-y:auto;padding:10px 14px;min-height:60px"></div>
         <div style="padding:12px 14px;border-top:1px solid var(--border)">
             <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:8px">// ADD PRESET</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center">
+            <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;align-items:center">
                 <input type="text" id="newPresetName" class="sys-input"
                     placeholder="Name (e.g. SUMMER HEAT)"
                     style="font-size:11px;padding:7px 9px;margin-bottom:0">
                 <input type="text" id="newPresetId" class="sys-input"
                     placeholder="Spotify playlist ID"
                     style="font-size:11px;padding:7px 9px;margin-bottom:0">
+                <button onclick="browsePresetsSpotify()"
+                    style="padding:7px 11px;background:rgba(77,184,255,0.08);border:1px solid var(--border2);color:var(--dim);font-family:'Share Tech Mono';font-size:11px;cursor:pointer;border-radius:var(--radius);white-space:nowrap;transition:all 0.15s"
+                    onmouseover="this.style.borderColor='var(--quincy)';this.style.color='var(--text)'"
+                    onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--dim)'">⌕ BROWSE</button>
                 <button onclick="addPreset()"
                     style="padding:7px 14px;background:var(--quincy2);border:none;color:#fff;font-family:'Share Tech Mono';font-size:11px;cursor:pointer;border-radius:var(--radius);white-space:nowrap;transition:background 0.15s"
                     onmouseover="this.style.background='var(--quincy)';this.style.color='var(--void)'"
                     onmouseout="this.style.background='var(--quincy2)';this.style.color='#fff'">+ ADD</button>
             </div>
+            <div id="presetBrowseList" style="display:none;margin-top:8px;max-height:160px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);background:rgba(0,0,0,0.3)"></div>
         </div>
     </div>
 </div>
@@ -1532,40 +1565,44 @@ function fmtMs(ms) {
 function verdictClass(v) {
     if (!v) return 'unrated';
     const vl = v.toUpperCase().trim();
-    if (vl === 'PERFECT MATCH')  return 'resonance';
-    if (vl === 'STRONG MATCH')     return 'locked';
-    if (vl === 'ALIGNED')  return 'adjacent';
-    if (vl === 'PERIPHERAL')      return 'peripheral';
-    if (vl === 'DISSONANT') return 'clash';
-    if (vl === 'NO MATCH')     return 'void-sig';
-    if (vl === 'ERROR')           return 'void-sig';
+    if (vl === 'CORE')      return 'resonance';
+    if (vl === 'ALIGNED')   return 'adjacent';
+    if (vl === 'FRINGE')    return 'peripheral';
+    if (vl === 'OUTLIER')   return 'clash';
+    if (vl === 'NO MATCH')  return 'void-sig';
+    if (vl === 'NO SIGNAL') return 'void-sig';
+    if (vl === 'ERROR')     return 'void-sig';
     return 'unrated';
 }
 
-// Quick 7-var score for master index / vault display (mirrors backend weights)
+// Quick 7-var score for master index / vault display (mirrors backend weights exactly)
 function calcScore(e, v, d, ac, ins, lo, bpm) {
     if (!vibeProfile || Object.keys(vibeProfile).length === 0) return 0;
     const p = vibeProfile;
     const normLoud = db => Math.max(0, Math.min(100, ((db + 30) / 30) * 100));
-    const normBpm  = (b, ref) => Math.min(100, Math.abs(b - ref) / 80.0 * 100);
-    const diffE   = Math.abs(e  - (p.energy          || 0));
-    const diffV   = Math.abs(v  - (p.valence         || 0));
-    const diffD   = Math.abs(d  - (p.dance           || 0));
-    const diffAc  = Math.abs(ac - (p.acousticness    || 0));
-    const diffIn  = Math.abs(ins- (p.instrumentalness|| 0));
-    const diffLo  = Math.abs(normLoud(lo) - normLoud(p.loudness || -8));
-    const diffBpm = normBpm(bpm, p.bpm || 120);
-    const totalW  = 1.0 + 1.0 + 0.85 + 0.70 + 0.70 + 0.60 + 0.45;
-    const wVar    = (diffE*1.0 + diffV*1.0 + diffD*0.85 + diffAc*0.70 + diffIn*0.70 + diffLo*0.60 + diffBpm*0.45) / totalW;
-    return Math.max(0, Math.min(100, Math.round(100 - wVar * 2.0)));
+    const normBpm  = (b, ref) => Math.min(100, Math.abs(b - ref) / 40.0 * 100);
+    // backend only includes ac/ins when the track's value is >= 2.0 (meaningful signal)
+    const useAc  = (ac  || 0) >= 2.0;
+    const useIns = (ins || 0) >= 2.0;
+    const diffE   = Math.abs((e   || 0) - (p.energy           || 0));
+    const diffV   = Math.abs((v   || 0) - (p.valence          || 0));
+    const diffD   = Math.abs((d   || 0) - (p.dance            || 0));
+    const diffLo  = Math.abs(normLoud(lo || 0) - normLoud(p.loudness || -8));
+    const diffBpm = normBpm(bpm || 0, p.bpm || 120);
+    const diffAc  = useAc  ? Math.abs((ac  || 0) - (p.acousticness     || 0)) : 0;
+    const diffIn  = useIns ? Math.abs((ins || 0) - (p.instrumentalness  || 0)) : 0;
+    let totalW = 1.0 + 1.0 + 0.85 + 0.60 + 0.45;
+    let wVar   = diffE*1.0 + diffV*1.0 + diffD*0.85 + diffLo*0.60 + diffBpm*0.45;
+    if (useAc)  { totalW += 0.70; wVar += diffAc * 0.70; }
+    if (useIns) { totalW += 0.70; wVar += diffIn * 0.70; }
+    return Math.max(0, Math.min(100, Math.round(100 - (wVar / totalW) * 2.0)));
 }
 
 function scoreToVerdict(score) {
-    if (score >= 90) return 'PERFECT MATCH';
-    if (score >= 75) return 'STRONG MATCH';
-    if (score >= 58) return 'ALIGNED';
-    if (score >= 40) return 'PERIPHERAL';
-    if (score >= 20) return 'DISSONANT';
+    if (score >= 85) return 'CORE';
+    if (score >= 65) return 'ALIGNED';
+    if (score >= 45) return 'FRINGE';
+    if (score >= 25) return 'OUTLIER';
     return 'NO MATCH';
 }
 
@@ -1579,11 +1616,11 @@ function get_camelot_js(key, mode) {
 }
 
 function getTier(score) {
-    if (score >= 90) return { tier: 'APEX',    color: 'var(--resonance)' };
-    if (score >= 75) return { tier: 'CORE',    color: 'var(--neon)'      };
-    if (score >= 58) return { tier: 'ALIGNED', color: 'var(--quincy)'    };
-    if (score >= 40) return { tier: 'FRINGE',  color: 'var(--chrome)'    };
-    return               { tier: 'OUTLIER', color: 'var(--bankai)'    };
+    if (score >= 85) return { tier: 'CORE',    color: 'var(--resonance)' };
+    if (score >= 65) return { tier: 'ALIGNED', color: 'var(--quincy)'    };
+    if (score >= 45) return { tier: 'FRINGE',  color: 'var(--chrome)'    };
+    if (score >= 25) return { tier: 'OUTLIER', color: 'var(--bankai)'    };
+    return               { tier: 'NO MATCH', color: 'var(--dim)'      };
 }
 
 function deltaClass(delta, tight = 15, loose = 30) {
@@ -1787,16 +1824,16 @@ async function loadData() {
         const avgE = total ? Math.round(tracks.reduce((a,b)=>a+b.energy,0)/total)  : 0;
         const avgV = total ? Math.round(tracks.reduce((a,b)=>a+b.valence,0)/total) : 0;
         const avgB = total ? Math.round(tracks.reduce((a,b)=>a+b.bpm,0)/total)     : 0;
-        const resonanceCount = tracks.filter(t => calcScore(t.energy,t.valence,t.dance,t.acousticness,t.instrumentalness,t.loudness,t.bpm) >= 90).length;
-        const lockedCount    = tracks.filter(t => { const s = calcScore(t.energy,t.valence,t.dance,t.acousticness,t.instrumentalness,t.loudness,t.bpm); return s >= 75 && s < 90; }).length;
+        const resonanceCount = tracks.filter(t => calcScore(t.energy,t.valence,t.dance,t.acousticness,t.instrumentalness,t.loudness,t.bpm) >= 85).length;
+        const lockedCount    = tracks.filter(t => { const s = calcScore(t.energy,t.valence,t.dance,t.acousticness,t.instrumentalness,t.loudness,t.bpm); return s >= 65 && s < 85; }).length;
 
         try {
             document.getElementById('kpis').innerHTML = `
                 <div class="kpi"><div class="kpi-label">TOTAL TRACKS</div><div class="kpi-val">${total}</div></div>
                 <div class="kpi"><div class="kpi-label">AVG ENERGY</div><div class="kpi-val chrome">${avgE}%</div></div>
                 <div class="kpi"><div class="kpi-label">AVG VALENCE</div><div class="kpi-val gold">${avgV}%</div></div>
-                <div class="kpi"><div class="kpi-label">PERFECT MATCH</div><div class="kpi-val cyan">${resonanceCount}</div></div>
-                <div class="kpi"><div class="kpi-label">STRONG MATCH</div><div class="kpi-val">${lockedCount}</div></div>
+                <div class="kpi"><div class="kpi-label">CORE</div><div class="kpi-val cyan">${resonanceCount}</div></div>
+                <div class="kpi"><div class="kpi-label">ALIGNED</div><div class="kpi-val">${lockedCount}</div></div>
                 <div class="kpi"><div class="kpi-label">AVG BPM</div><div class="kpi-val">${avgB}</div></div>
                 <div class="kpi"><div class="kpi-label">VAULT INDEXED</div><div class="kpi-val">${cached}</div></div>
                 <div class="kpi"><div class="kpi-label">COVERAGE</div><div class="kpi-val" style="font-size:36px">${total ? Math.round((cached/total)*100) : 0}%</div></div>
@@ -1834,7 +1871,7 @@ async function loadData() {
             if (Array.isArray(dna) && dna.length > 0) {
                 document.getElementById('dnaGrid').innerHTML = dna.map(tag => `<div class="dna-tag">${tag}</div>`).join('');
             } else {
-                document.getElementById('dnaGrid').innerHTML = '<div style="font-family:\'Share Tech Mono\';font-size:11px;color:var(--dim);">No DNA extracted yet. Run learn.py or sync your playlist.</div>';
+                document.getElementById('dnaGrid').innerHTML = '<div style="font-family:\'Share Tech Mono\';font-size:11px;color:var(--dim);">No DNA extracted yet. Sync a playlist to build your genre profile.</div>';
             }
         } catch(e) { console.error('dnaGrid render', e); }
 
@@ -1955,6 +1992,10 @@ async function fetchVaultName(id) {
 function renderVault() {
     const q    = (document.getElementById('vaultSearch')?.value || '').toLowerCase();
     const sort = document.getElementById('vaultSort')?.value || 'num';
+    const minScore   = parseFloat(document.getElementById('filterMinScore')?.value)   || 0;
+    const minEnergy  = parseFloat(document.getElementById('filterMinEnergy')?.value)  || 0;
+    const minValence = parseFloat(document.getElementById('filterMinValence')?.value) || 0;
+    const minDance   = parseFloat(document.getElementById('filterMinDance')?.value)   || 0;
 
     // Build a merged view: start with vaultData (SQLite, the source of truth for metrics),
     // then overlay song/artist names from the tracks CSV where available.
@@ -1982,11 +2023,26 @@ function renderVault() {
             source:           v.source || 'reccobeats',
         };
     }).filter(t => {
-        if (!q) return true;
-        return t.song.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q);
+        if (q && !t.song.toLowerCase().includes(q) && !t.artist.toLowerCase().includes(q)) return false;
+        return true;
     });
 
     filtered = filtered.map(t => ({ ...t, _score: calcScore(t.energy, t.valence, t.dance, t.acousticness, t.instrumentalness, t.loudness, t.bpm) }));
+
+    // apply threshold filters
+    if (minScore > 0 || minEnergy > 0 || minValence > 0 || minDance > 0) {
+        filtered = filtered.filter(t => {
+            if (t.energy === 0 && t.bpm === 0) return false; // exclude ghosts from threshold filter
+            if (minScore   > 0 && (t._score  || 0) < minScore)   return false;
+            if (minEnergy  > 0 && (t.energy  || 0) < minEnergy)  return false;
+            if (minValence > 0 && (t.valence || 0) < minValence) return false;
+            if (minDance   > 0 && (t.dance   || 0) < minDance)   return false;
+            return true;
+        });
+    }
+    const countEl = document.getElementById('vaultFilterCount');
+    const hasFilter = minScore > 0 || minEnergy > 0 || minValence > 0 || minDance > 0 || q;
+    if (countEl) countEl.textContent = hasFilter ? `${filtered.length} match${filtered.length !== 1 ? 'es' : ''}` : '';
 
     if (sort === 'score_desc')        filtered.sort((a,b) => b._score - a._score);
     else if (sort === 'score_asc')    filtered.sort((a,b) => a._score - b._score);
@@ -2696,16 +2752,47 @@ function startSSE() {
     });
 
     // Reccobeats offline / system warnings
+    sseSource.addEventListener('ghost_resolved', e => {
+        try {
+            const d = JSON.parse(e.data);
+            // live-update vault row if the vault tab is showing this track
+            if (Array.isArray(vaultData)) {
+                const idx = vaultData.findIndex(r => r.id === d.id);
+                if (idx !== -1) {
+                    vaultData[idx].energy           = d.energy;
+                    vaultData[idx].valence           = d.valence;
+                    vaultData[idx].danceability      = d.danceability;
+                    vaultData[idx].bpm               = d.bpm;
+                    vaultData[idx].acousticness      = d.acousticness;
+                    vaultData[idx].instrumentalness  = d.instrumentalness;
+                    vaultData[idx].loudness          = d.loudness;
+                    vaultData[idx].key               = d.key;
+                    vaultData[idx].mode              = d.mode;
+                    vaultData[idx].source            = d.method;
+                    renderVault();
+                }
+            }
+            // also show a brief status banner
+            if (d.score !== null) {
+                showGhostStatusBanner(`GHOST RESOLVED — ${d.verdict} ${d.score}%`, 'success');
+            }
+        } catch(err) {}
+    });
+
     sseSource.addEventListener('vault_updated', e => {
         try {
+            const d = JSON.parse(e.data);
+            // if a full recalc happened (after ghost resolution), reload taste profile
+            if (d && d.recalc) {
+                fetch('/api/vibe_profile').then(r => r.json()).then(p => {
+                    if (p && !p.error) { vibeProfile = p; try { buildDashRadar(vibeProfile); } catch(e) {} }
+                }).catch(() => {});
+            }
             // Quietly refresh vault stats count so the header badge stays accurate.
-            // NOTE: d is {cached: N} from /api/vault_stats — NOT the vault array.
-            // Only update the count display; do NOT assign to vaultData (that's the full array).
             fetch('/api/vault_stats').then(r => r.json()).then(d => {
                 const count = d.cached || 0;
                 const el = document.getElementById('vaultCount');
                 if (el) el.textContent = count;
-                // Also update the sidebar vault label and bar if visible
                 const total = Array.isArray(tracks) ? tracks.length : 0;
                 const lbl = document.getElementById('vaultLabel');
                 if (lbl) lbl.textContent = `VAULT: ${count} / ${total}`;
@@ -3082,41 +3169,6 @@ async function maybeAutoAdd(trackId, score, trackName) {
     }
 }
 
-// vault sync
-// Auto-adder #1: syncs your playlist tracks into the vault
-
-async function syncVaultFromPlaylist() {
-    const pid = await customPrompt(
-        '◈ SYNC VAULT FROM PLAYLIST',
-        'Paste a Spotify Playlist ID or URL to cache all its tracks:',
-        '// E.G. 37i9dQZF1DXcBWIGoYBM5M'
-    );
-    if (!pid || !pid.trim()) return;
-    const btn = document.getElementById('vaultSyncBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>SYNCING VAULT…';
-    showToast('// VAULT SYNC — fetching playlist from Spotify…');
-    try {
-        const res = await fetch('/api/sync_vault_from_playlist', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({playlist_id: pid.trim()})
-        });
-        const data = await res.json();
-        if (data.success) {
-            showToast(`// ${data.message}`);
-            await loadData();
-        } else {
-            showToast(`// VAULT SYNC ERROR: ${data.error}`, 'error');
-        }
-    } catch(e) {
-        showToast('// VAULT SYNC FAILED — server unreachable', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '◈ SYNC VAULT FROM PLAYLIST';
-    }
-}
-
 // export session
 
 async function exportSessionLog() {
@@ -3195,32 +3247,31 @@ async function runPlaylistAudit() {
 
         const scored = data.filter(t => t.score !== null);
         const counts = {
-            'PERFECT MATCH': 0, 'STRONG MATCH': 0, 'ALIGNED': 0,
-            'PERIPHERAL': 0, 'DISSONANT': 0, 'NO MATCH': 0, 'GHOST': 0
+            'CORE': 0, 'ALIGNED': 0, 'FRINGE': 0,
+            'OUTLIER': 0, 'NO MATCH': 0, 'NO SIGNAL': 0, 'GHOST': 0
         };
         data.forEach(t => { if (counts[t.verdict] !== undefined) counts[t.verdict]++; });
 
         const avgScore = scored.length ? Math.round(scored.reduce((a,b)=>a+b.score,0)/scored.length) : 0;
-        const topHits  = scored.filter(t => t.score >= 75).length;
+        const topHits  = scored.filter(t => t.score >= 65).length;
 
         document.getElementById('auditKpis').innerHTML = `
             <div class="kpi"><div class="kpi-label">TOTAL TRACKS</div><div class="kpi-val">${data.length}</div></div>
             <div class="kpi"><div class="kpi-label">AVG SCORE</div><div class="kpi-val chrome">${avgScore}%</div></div>
-            <div class="kpi"><div class="kpi-label">STRONG MATCH+</div><div class="kpi-val cyan">${topHits}</div></div>
-            <div class="kpi"><div class="kpi-label">RESONANCE</div><div class="kpi-val gold">${counts['PERFECT MATCH']}</div></div>
+            <div class="kpi"><div class="kpi-label">ALIGNED+</div><div class="kpi-val cyan">${topHits}</div></div>
+            <div class="kpi"><div class="kpi-label">CORE</div><div class="kpi-val gold">${counts['CORE']}</div></div>
             <div class="kpi"><div class="kpi-label">GHOSTS</div><div class="kpi-val red">${counts['GHOST']}</div></div>
             <div class="kpi"><div class="kpi-label">COVERAGE</div><div class="kpi-val">${data.length ? Math.round((scored.length/data.length)*100) : 0}%</div></div>
         `;
 
         // Distribution bar
         const verdictMeta = [
-            ['PERFECT MATCH', 'var(--resonance)'],
-            ['STRONG MATCH',    'var(--neon)'],
-            ['ALIGNED', 'var(--quincy)'],
-            ['PERIPHERAL',     'var(--chrome)'],
-            ['DISSONANT','var(--clash)'],
-            ['NO MATCH',    'var(--bankai)'],
-            ['GHOST',          'var(--dim)'],
+            ['CORE',     'var(--resonance)'],
+            ['ALIGNED',  'var(--quincy)'],
+            ['FRINGE',   'var(--chrome)'],
+            ['OUTLIER',  'var(--clash)'],
+            ['NO MATCH', 'var(--bankai)'],
+            ['GHOST',    'var(--dim)'],
         ];
         const total = data.length || 1;
         document.getElementById('auditDistBar').innerHTML =
@@ -3859,6 +3910,225 @@ refreshDevices();
         }
     } catch(_) {}
 })();
+
+// vault filter export / clear
+function clearVaultFilters() {
+    ['filterMinScore','filterMinEnergy','filterMinValence','filterMinDance'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const countEl = document.getElementById('vaultFilterCount');
+    if (countEl) countEl.textContent = '';
+    renderVault();
+}
+
+function exportFilteredVault() {
+    const q         = (document.getElementById('vaultSearch')?.value || '').toLowerCase();
+    const minScore  = parseFloat(document.getElementById('filterMinScore')?.value)   || 0;
+    const minEnergy = parseFloat(document.getElementById('filterMinEnergy')?.value)  || 0;
+    const minVal    = parseFloat(document.getElementById('filterMinValence')?.value) || 0;
+    const minDance  = parseFloat(document.getElementById('filterMinDance')?.value)   || 0;
+    const nameMap   = {};
+    tracks.forEach(t => { if (t.id) nameMap[t.id] = t; });
+
+    const rows = vaultData.map(v => {
+        const meta = nameMap[v.id] || vaultNameCache[v.id] || {};
+        const score = calcScore(v.energy, v.valence, v.danceability, v.acousticness, v.instrumentalness, v.loudness, v.bpm);
+        return {
+            id: v.id,
+            song: meta.song || '',
+            artist: meta.artist || '',
+            energy: Math.round(v.energy),
+            valence: Math.round(v.valence),
+            dance: Math.round(v.danceability),
+            bpm: Math.round(v.bpm),
+            acousticness: Math.round(v.acousticness),
+            score,
+        };
+    }).filter(t => {
+        if (t.energy === 0 && t.bpm === 0) return false;
+        if (q && !t.song.toLowerCase().includes(q) && !t.artist.toLowerCase().includes(q)) return false;
+        if (minScore  > 0 && t.score   < minScore)  return false;
+        if (minEnergy > 0 && t.energy  < minEnergy) return false;
+        if (minVal    > 0 && t.valence < minVal)     return false;
+        if (minDance  > 0 && t.dance   < minDance)   return false;
+        return true;
+    });
+
+    if (!rows.length) { showToast('No tracks match current filters'); return; }
+
+    const header = 'Spotify Track ID,Song,Artist,Energy,Valence,Danceability,BPM,Acousticness,Score';
+    const csv = [header, ...rows.map(r =>
+        r.id + ',"' + (r.song||'').replace(/"/g,'""') + '","' + (r.artist||'').replace(/"/g,'""') + '",' + r.energy + ',' + r.valence + ',' + r.dance + ',' + r.bpm + ',' + r.acousticness + ',' + r.score
+    )].join('\n');
+
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'ventus_filtered_' + Date.now() + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('// EXPORTED ' + rows.length + ' tracks');
+}
+
+// master vault
+async function openMasterVault() {
+    let overlay = document.getElementById('masterVaultOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'masterVaultOverlay';
+        overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(1,3,6,0.88);z-index:9999;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto';
+        overlay.innerHTML = `
+        <div style="width:720px;max-width:95vw;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:22px 24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <div style="font-family:'Share Tech Mono';font-size:13px;color:var(--text);letter-spacing:1px">⬡ MASTER VAULT</div>
+                <button onclick="closeMasterVault()" style="background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;padding:0 4px">✕</button>
+            </div>
+            <div style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);margin-bottom:14px;line-height:1.6">
+                Bulk-import any playlists for deeper taste profile training. Stored separately from your main vault — doesn't affect listening history.
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+                <input type="text" id="mvPlaylistId" class="sys-input" placeholder="Spotify playlist ID or URL" style="flex:1;font-size:11px;padding:7px 9px;margin-bottom:0">
+                <button onclick="masterVaultSync()" id="mvSyncBtn"
+                    style="padding:7px 16px;background:var(--quincy2);border:none;color:#fff;font-family:'Share Tech Mono';font-size:11px;cursor:pointer;border-radius:var(--radius)">
+                    ⬡ IMPORT
+                </button>
+                <button onclick="masterVaultBrowse()" id="mvBrowseBtn"
+                    style="padding:7px 12px;background:rgba(77,184,255,0.08);border:1px solid var(--border2);color:var(--dim);font-family:'Share Tech Mono';font-size:11px;cursor:pointer;border-radius:var(--radius)">
+                    ⌕ BROWSE
+                </button>
+            </div>
+            <div id="mvBrowseList" style="display:none;margin-bottom:10px;max-height:140px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);background:rgba(0,0,0,0.3)"></div>
+            <div id="mvStatus" style="font-family:'Share Tech Mono';font-size:10px;color:var(--quincy);min-height:18px;margin-bottom:12px"></div>
+            <div id="mvStats" style="font-family:'Share Tech Mono';font-size:10px;color:var(--dim);margin-bottom:14px"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <div style="font-family:'Share Tech Mono';font-size:9px;color:var(--dim);letter-spacing:1px">// INDEXED TRACKS</div>
+                <button onclick="masterVaultClear()" style="background:none;border:1px solid rgba(255,80,80,0.3);color:rgba(255,80,80,0.6);font-family:'Share Tech Mono';font-size:9px;cursor:pointer;padding:4px 10px;border-radius:var(--radius)">✕ CLEAR ALL</button>
+            </div>
+            <div id="mvList" style="max-height:300px;overflow-y:auto;font-family:'Share Tech Mono';font-size:10px"></div>
+        </div>`;
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    renderMasterVaultStats();
+    renderMasterVaultList();
+}
+
+function closeMasterVault() {
+    const overlay = document.getElementById('masterVaultOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+async function renderMasterVaultStats() {
+    try {
+        const d = await fetch('/api/master_vault/stats').then(r => r.json());
+        const el = document.getElementById('mvStats');
+        if (el) el.textContent = `${d.total || 0} tracks total — ${d.indexed || 0} indexed, ${d.ghost || 0} ghost`;
+    } catch(e) {}
+}
+
+async function renderMasterVaultList() {
+    const el = document.getElementById('mvList');
+    if (!el) return;
+    el.innerHTML = '<div style="color:var(--dim);padding:10px">Loading…</div>';
+    try {
+        const d = await fetch('/api/master_vault/list').then(r => r.json());
+        if (!d.tracks || d.tracks.length === 0) {
+            el.innerHTML = '<div style="color:var(--dim);padding:10px">No tracks yet. Import a playlist above.</div>';
+            return;
+        }
+        el.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 90px 56px 56px 56px 60px;gap:4px;padding:6px 10px;color:var(--dim);font-size:9px;border-bottom:1px solid var(--border2);letter-spacing:0.5px">
+            <div>TRACK</div><div>KEY</div><div>NRG</div><div>VAL</div><div>BPM</div><div>SOURCE</div>
+        </div>` +
+        d.tracks.map(t => `
+        <div style="display:grid;grid-template-columns:1fr 90px 56px 56px 56px 60px;gap:4px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${t.song || t.id} <span style="color:var(--dim)">${t.artist ? '— ' + t.artist : ''}</span></div>
+            <div style="color:var(--quincy)">${t.camelot || '--'}</div>
+            <div style="color:var(--text)">${t.energy ? t.energy.toFixed(0)+'%' : '--'}</div>
+            <div style="color:var(--text)">${t.valence ? t.valence.toFixed(0)+'%' : '--'}</div>
+            <div style="color:var(--text)">${t.bpm ? t.bpm.toFixed(0) : '--'}</div>
+            <div style="color:var(--dim);font-size:9px">${(t.source||'').slice(0,8)}</div>
+        </div>`).join('');
+    } catch(e) {
+        el.innerHTML = '<div style="color:rgba(255,80,80,0.7);padding:10px">Failed to load</div>';
+    }
+}
+
+async function masterVaultSync() {
+    const pidRaw = document.getElementById('mvPlaylistId')?.value?.trim();
+    if (!pidRaw) return;
+    const pid = pidRaw.includes('/') ? pidRaw.split('/').pop().split('?')[0] : pidRaw;
+    const btn = document.getElementById('mvSyncBtn');
+    const status = document.getElementById('mvStatus');
+    btn.disabled = true; btn.textContent = 'IMPORTING…';
+    if (status) status.textContent = 'Fetching playlist from Spotify…';
+    try {
+        const res = await fetch('/api/master_vault/sync', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({playlist_id: pid})
+        });
+        const d = await res.json();
+        if (status) status.textContent = d.message || d.error || 'Done';
+        renderMasterVaultStats();
+        renderMasterVaultList();
+    } catch(e) {
+        if (status) status.textContent = 'Import failed — server unreachable';
+    } finally {
+        btn.disabled = false; btn.textContent = '⬡ IMPORT';
+    }
+}
+
+async function masterVaultBrowse() {
+    const listEl = document.getElementById('mvBrowseList');
+    if (!listEl) return;
+    if (listEl.style.display !== 'none') { listEl.style.display = 'none'; return; }
+    listEl.style.display = 'block';
+    listEl.innerHTML = '<div style="padding:8px 12px;color:var(--dim);font-family:\'Share Tech Mono\';font-size:10px">Loading your playlists…</div>';
+    try {
+        const d = await fetch('/api/user_playlists').then(r => r.json());
+        const playlists = Array.isArray(d) ? d : [];
+        if (!playlists.length) { listEl.innerHTML = '<div style="padding:8px 12px;color:var(--dim);font-size:10px">No playlists found</div>'; return; }
+        listEl.innerHTML = playlists.map(p => `
+        <div onclick="document.getElementById('mvPlaylistId').value='${p.id}';document.getElementById('mvBrowseList').style.display='none'"
+            style="padding:7px 12px;cursor:pointer;font-family:'Share Tech Mono';font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text);display:flex;justify-content:space-between"
+            onmouseover="this.style.background='rgba(77,184,255,0.07)'" onmouseout="this.style.background=''"
+        ><span>${p.name}</span><span style="color:var(--dim)">${p.track_count || 0} tracks</span></div>`).join('');
+    } catch(e) {
+        listEl.innerHTML = '<div style="padding:8px 12px;color:rgba(255,80,80,0.7);font-size:10px">Failed to load playlists</div>';
+    }
+}
+
+async function masterVaultClear() {
+    if (!confirm('Clear all tracks from Master Vault? This cannot be undone.')) return;
+    try {
+        await fetch('/api/master_vault/clear', {method:'POST'});
+        renderMasterVaultStats();
+        renderMasterVaultList();
+    } catch(e) {}
+}
+
+// browse spotify playlists for preset manager
+async function browsePresetsSpotify() {
+    const listEl = document.getElementById('presetBrowseList');
+    if (!listEl) return;
+    if (listEl.style.display !== 'none') { listEl.style.display = 'none'; return; }
+    listEl.style.display = 'block';
+    listEl.innerHTML = '<div style="padding:8px 12px;color:var(--dim);font-family:\'Share Tech Mono\';font-size:10px">Loading your playlists…</div>';
+    try {
+        const d = await fetch('/api/user_playlists').then(r => r.json());
+        const playlists = Array.isArray(d) ? d : [];
+        if (!playlists.length) { listEl.innerHTML = '<div style="padding:8px 12px;color:var(--dim);font-size:10px">No playlists found</div>'; return; }
+        listEl.innerHTML = playlists.map(p => `
+        <div onclick="document.getElementById('newPresetName').value='${p.name.replace(/'/g,"\\'")}';document.getElementById('newPresetId').value='${p.id}';document.getElementById('presetBrowseList').style.display='none'"
+            style="padding:7px 12px;cursor:pointer;font-family:'Share Tech Mono';font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text);display:flex;justify-content:space-between"
+            onmouseover="this.style.background='rgba(77,184,255,0.07)'" onmouseout="this.style.background=''"
+        ><span>${p.name}</span><span style="color:var(--dim)">${p.track_count || 0} tracks</span></div>`).join('');
+    } catch(e) {
+        listEl.innerHTML = '<div style="padding:8px 12px;color:rgba(255,80,80,0.7);font-size:10px">Failed to load playlists</div>';
+    }
+}
 </script>
 </body>
 </html>

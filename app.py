@@ -6,6 +6,12 @@ import os
 import json
 import time
 import sys
+
+# fix stdout encoding on windows - must be before any print()
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 import queue
 import threading
 import tempfile
@@ -22,11 +28,7 @@ except ImportError:
     LIBROSA_OK = False
     print("[BOOT] librosa NOT installed — Ghost Signal DISABLED (pip install librosa to enable)")
 
-# fix stdout encoding on windows
-if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
-    sys.stderr.reconfigure(encoding='utf-8')
+
 
 # resolve base path when running as pyinstaller bundle
 if getattr(sys, 'frozen', False):
@@ -57,11 +59,20 @@ def get_auth_url(): return "https://accounts.s" + "potify.com/api/token"
 def get_api():      return "https://api.s"       + "potify.com/v1"
 
 # sqlite vault - WAL mode for concurrent reads, upserts via INSERT OR REPLACE
-DB_FILE = os.path.join(_HERE, 'vibe_vault.db')
+DB_FILE        = os.path.join(_HERE, 'vibe_vault.db')
+MASTER_DB_FILE = os.path.join(_HERE, 'vibe_vault_master.db')
 
 def _db():
     """Per-call connection with WAL enabled. Use as context manager."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def _master_db():
+    """Connection to the master vault (separate DB, same schema)."""
+    conn = sqlite3.connect(MASTER_DB_FILE, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.row_factory = sqlite3.Row
@@ -118,6 +129,30 @@ def _init_db():
             print(f"[VAULT] CSV migration failed (non-fatal): {e}")
 
 _init_db()
+
+def _init_master_db():
+    with _master_db() as c:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS master_vault (
+                id               TEXT PRIMARY KEY,
+                song             TEXT DEFAULT '',
+                artist           TEXT DEFAULT '',
+                energy           REAL DEFAULT 0,
+                valence          REAL DEFAULT 0,
+                danceability     REAL DEFAULT 0,
+                bpm              REAL DEFAULT 0,
+                acousticness     REAL DEFAULT 0,
+                instrumentalness REAL DEFAULT 0,
+                loudness         REAL DEFAULT 0,
+                key              INTEGER DEFAULT -1,
+                mode             INTEGER DEFAULT 1,
+                source           TEXT DEFAULT 'reccobeats',
+                added_at         TEXT DEFAULT ''
+            )
+        """)
+        c.commit()
+
+_init_master_db()
 
 def _row_to_feat(row) -> dict:
     return {
@@ -326,33 +361,34 @@ TASTE_PROFILE = get_taste_profile()
 # scoring
 def score_features(data):
     p = TASTE_PROFILE
-    def nl(db):      return max(0,min(100,((db+30)/30)*100))
-    def nb(bpm,ref): return min(100,abs(bpm-ref)/80.0*100)
-    use_ac  = data['acousticness']     >= 2.0
-    use_ins = data['instrumentalness'] >= 2.0
-    de = abs(data['energy']-p['energy'])
-    dv = abs(data['valence']-p['valence'])
-    dd = abs(data['danceability']-p['dance'])
-    dl = abs(nl(data['loudness'])-nl(p['loudness']))
-    db = nb(data['bpm'],p['bpm'])
-    da = abs(data['acousticness']-p['acousticness'])     if use_ac  else 0
-    di = abs(data['instrumentalness']-p['instrumentalness']) if use_ins else 0
-    axes = [(de,1.00),(dv,1.00),(dd,0.85),(dl,0.60),(db,0.45)]
-    if use_ac:  axes.append((da,0.70))
-    if use_ins: axes.append((di,0.70))
-    tw  = sum(w for _,w in axes)
-    wv  = sum(d*w for d,w in axes)/tw
-    scr = max(0,min(100,round(100-(wv*2.0))))
-    if   scr>=90: verdict="PERFECT MATCH"
-    elif scr>=75: verdict="STRONG MATCH"
-    elif scr>=58: verdict="ALIGNED"
-    elif scr>=40: verdict="PERIPHERAL"
-    elif scr>=20: verdict="DISSONANT"
-    else:         verdict="NO MATCH"
+    if not p:
+        return 0, "NO SIGNAL", {}
+    def nl(db):      return max(0, min(100, ((db + 30) / 30) * 100))
+    def nb(bpm, ref): return min(100, abs(bpm - ref) / 40.0 * 100)  # tightened from /80
+    use_ac  = (data.get('acousticness', 0) or 0) >= 2.0
+    use_ins = (data.get('instrumentalness', 0) or 0) >= 2.0
+    de = abs((data.get('energy', 0) or 0) - (p.get('energy', 0) or 0))
+    dv = abs((data.get('valence', 0) or 0) - (p.get('valence', 0) or 0))
+    dd = abs((data.get('danceability', 0) or 0) - (p.get('dance', 0) or 0))
+    dl = abs(nl(data.get('loudness', 0) or 0) - nl(p.get('loudness', 0) or 0))
+    db = nb(data.get('bpm', 0) or 0, p.get('bpm', 0) or 0)
+    da = abs((data.get('acousticness', 0) or 0) - (p.get('acousticness', 0) or 0)) if use_ac else 0
+    di = abs((data.get('instrumentalness', 0) or 0) - (p.get('instrumentalness', 0) or 0)) if use_ins else 0
+    axes = [(de, 1.00), (dv, 1.00), (dd, 0.85), (dl, 0.60), (db, 0.45)]
+    if use_ac:  axes.append((da, 0.70))
+    if use_ins: axes.append((di, 0.70))
+    tw  = sum(w for _, w in axes)
+    wv  = sum(d * w for d, w in axes) / tw
+    scr = max(0, min(100, round(100 - (wv * 2.0))))
+    if   scr >= 85: verdict = "CORE"
+    elif scr >= 65: verdict = "ALIGNED"
+    elif scr >= 45: verdict = "FRINGE"
+    elif scr >= 25: verdict = "OUTLIER"
+    else:           verdict = "NO MATCH"
     return scr, verdict, {
-        "Energy":round(de,1),"Valence":round(dv,1),"Dance":round(dd,1),
-        "Acoustic":round(da,1),"Instrumental":round(di,1),
-        "Loudness":round(dl,1),"BPM":round(db,1),
+        "Energy": round(de, 1), "Valence": round(dv, 1), "Dance": round(dd, 1),
+        "Acoustic": round(da, 1), "Instrumental": round(di, 1),
+        "Loudness": round(dl, 1), "BPM": round(db, 1),
     }
 
 # SSE - defined early so reccobeats fetch can broadcast warnings
@@ -508,9 +544,18 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
 
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         bpm      = float(tempo[0]) if hasattr(tempo,"__len__") else float(tempo)
+        # half-tempo correction — librosa often locks onto the half-beat on energetic tracks
+        onset_strength = float(np.mean(librosa.onset.onset_strength(y=y, sr=sr)))
+        if bpm < 100 and onset_strength > 3.0:
+            bpm *= 2
+        elif bpm < 110 and onset_strength > 4.5:
+            bpm *= 2
 
         rms    = librosa.feature.rms(y=y)
-        energy = min(100.0, max(0.0, float(np.mean(rms))*350.0))
+        rms_mean = float(np.mean(rms))
+        rms_peak = float(np.percentile(rms, 95)) + 1e-6
+        # normalize against track's own dynamic range instead of hardcoded multiplier
+        energy = min(100.0, max(0.0, (rms_mean / rms_peak) * 100.0 * 1.8))
 
         S        = np.abs(librosa.stft(y))
         loudness = float(np.mean(librosa.amplitude_to_db(S, ref=np.max)))
@@ -518,18 +563,22 @@ def decrypt_ghost_signal(track_id:str, token:str) -> dict | None:
         centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
         valence  = min(100.0, max(0.0, (float(np.mean(centroid))-500)/35.0))
 
+        # reuse already-computed onset_strength array; also reuse stft
         onset_env = librosa.onset.onset_strength(y=y, sr=sr)
         dance     = min(100.0, max(0.0, 100-float(np.std(onset_env))*4))
 
-        spec         = np.abs(librosa.stft(y))
-        low          = float(np.mean(spec[:spec.shape[0]//4,:]))
-        high         = float(np.mean(spec[spec.shape[0]//4:,:]))
+        # reuse S from loudness calc above
+        low          = float(np.mean(S[:S.shape[0]//4,:]))
+        high         = float(np.mean(S[S.shape[0]//4:,:]))
         acousticness = min(100.0, max(0.0, (low/(high+1e-6))*25))
 
         chroma    = librosa.feature.chroma_cqt(y=y, sr=sr)
         key_idx   = int(np.argmax(np.mean(chroma, axis=1)))
-        y_harm, _ = librosa.effects.hpss(y)
-        mode      = 1 if float(np.mean(np.abs(y_harm))) > 0.005 else 0
+        y_harm, y_perc = librosa.effects.hpss(y)
+        harm_energy = float(np.mean(y_harm ** 2))
+        perc_energy = float(np.mean(y_perc ** 2))
+        # major if harmonic energy dominates, minor if percussive/tense
+        mode      = 1 if harm_energy >= perc_energy * 0.8 else 0
 
         _gs(f"DECRYPTION COMPLETE — BPM:{bpm:.0f} NRG:{energy:.0f}% KEY:{get_camelot(key_idx,mode)}")
         return {
@@ -842,6 +891,22 @@ def _playlist_autosync_worker():
             if not id_col:
                 continue
             existing = set(df[id_col].dropna().astype(str))
+            # deletion sync
+            playlist_ids_auto = set()
+            for pl in all_items:
+                t = pl.get('item') or pl.get('track')
+                if t and t.get('id'):
+                    playlist_ids_auto.add(t['id'])
+            removed_auto = existing - playlist_ids_auto
+            if removed_auto:
+                df = df[~df[id_col].isin(removed_auto)]
+                df.to_csv(master_path, index=False)
+                with _db() as c:
+                    c.executemany("DELETE FROM vault WHERE id=?", [(rid,) for rid in removed_auto])
+                    c.commit()
+                print(f"[AUTO-SYNC] Removed {len(removed_auto)} tracks no longer in playlist", flush=True)
+                existing -= removed_auto
+
             new_ids = []
             track_meta = {}
             for pl in all_items:
@@ -1153,6 +1218,22 @@ def sync_playlist():
     lo_col=find_col(df,['loud'])    or 'Loudness';  k_col=find_col(df,['camelot','key']) or 'Camelot'
 
     existing = set(df[id_col].dropna().astype(str))
+    # deletion sync — remove tracks from CSV and vault that are no longer in the playlist
+    playlist_ids = set()
+    for pl in all_items:
+        t = pl.get('item') or pl.get('track')
+        if t and t.get('id'):
+            playlist_ids.add(t['id'])
+    removed_ids = existing - playlist_ids
+    if removed_ids:
+        df = df[~df[id_col].isin(removed_ids)]
+        df.to_csv(master_path, index=False)
+        with _db() as c:
+            c.executemany("DELETE FROM vault WHERE id=?", [(rid,) for rid in removed_ids])
+            c.commit()
+        print(f"[SYNC] Removed {len(removed_ids)} tracks no longer in playlist", flush=True)
+        existing -= removed_ids
+
     to_fetch=[]; track_meta={}
     for pl in all_items:
         t = pl.get('item') or pl.get('track')
@@ -1179,7 +1260,7 @@ def sync_playlist():
     if new_rows:
         pd.concat([df,pd.DataFrame(new_rows)],ignore_index=True).to_csv(master_path,index=False)
         global TASTE_PROFILE; TASTE_PROFILE=get_taste_profile()
-        # ── Also push all tracks that have metrics into the SQLite vault ──────
+        # push all tracks that have metrics into the SQLite vault
         vault_rows = []
         for rd in new_rows:
             # Only insert rows where ReccoBeats actually returned features
@@ -1205,6 +1286,7 @@ def sync_playlist():
                      if not (rd.get(e_col) or rd.get(b_col)) and rd.get(id_col,'')]
         if ghost_ids:
             def _bg_resolve_ghosts(ids, tok):
+                global TASTE_PROFILE
                 resolved = 0
                 for tid in ids:
                     if vault_get(tid): continue
@@ -1212,8 +1294,26 @@ def sync_playlist():
                     if feat:
                         resolved += 1
                         print(f"[SYNC-BG] {tid[:18]} resolved via {method}", flush=True)
+                        sc, vd, _ = score_features(feat) if TASTE_PROFILE else (None, "NO SIGNAL", {})
+                        _sse_broadcast("ghost_resolved", {
+                            "id": tid,
+                            "method": method,
+                            "score": sc,
+                            "verdict": vd,
+                            "energy": round(feat.get("energy", 0), 1),
+                            "valence": round(feat.get("valence", 0), 1),
+                            "danceability": round(feat.get("danceability", 0), 1),
+                            "bpm": round(feat.get("bpm", 0), 1),
+                            "acousticness": round(feat.get("acousticness", 0), 1),
+                            "instrumentalness": round(feat.get("instrumentalness", 0), 1),
+                            "loudness": round(feat.get("loudness", 0), 1),
+                            "key": feat.get("key", -1),
+                            "mode": feat.get("mode", 1),
+                            "camelot": get_camelot(feat.get("key", -1), feat.get("mode", 1)),
+                        })
                 print(f"[SYNC-BG] Done — {resolved}/{len(ids)} ghost tracks resolved", flush=True)
-                _sse_broadcast("vault_updated", {"msg": f"Background resolved {resolved}/{len(ids)} ghost tracks"})
+                TASTE_PROFILE = get_taste_profile()
+                _sse_broadcast("vault_updated", {"msg": f"Background resolved {resolved}/{len(ids)} ghost tracks", "recalc": True})
             _bg_tok = get_spotify_token()
             threading.Thread(target=_bg_resolve_ghosts, args=(ghost_ids, _bg_tok), daemon=True).start()
             print(f"[SYNC] {len(ghost_ids)} ghost tracks queued for background resolution", flush=True)
@@ -1629,8 +1729,23 @@ def rebuild_dna():
     id_col=find_col(df,['spotify track id','track id','id'])
     n_col=find_col(df,['song','name','track'], exclude=[id_col]); a_col=find_col(df,['artist'])
     if not n_col or not a_col: return jsonify({"error":"Cannot find track/artist columns"}),500
-    SKIP={'seen live','favorites','favourite','spotify','track'}
-    tag_counts={}
+    SKIP={
+        'seen live','favorites','favourite','spotify','track','music','albums i own',
+        'check out','awesome','good','cool','nice','best','beautiful','love',
+        'heard on tv','heard on radio','sexy','hot','amazing','epic','perfect',
+        'furry','fandom','meme','viral','youtube','tiktok','netflix',
+        'under 2000 listeners','under 5000 listeners','2000s','1990s','1980s',
+        '00s','90s','80s','70s','60s','50s',
+    }
+    # load existing tags so rebuild merges rather than overwrites
+    existing_dna_path = os.path.join(_HERE, 'vibe_dna.json')
+    try:
+        with open(existing_dna_path, 'r', encoding='utf-8') as _f:
+            existing_tags = json.load(_f)
+        # prime the counts so existing tags start with a head-start
+        tag_counts = {t: 2 for t in existing_tags if t not in SKIP}
+    except Exception:
+        tag_counts = {}
     for _,row in df.iterrows():
         url=(f"http://ws.audioscrobbler.com/2.0/?method=track.getTopTags"
              f"&artist={requests.utils.quote(str(row[a_col]))}"
@@ -1792,7 +1907,7 @@ def get_top():
                 out.append({"id":item['id'],"name":item['name'],
                     "genres":item.get('genres',[]),"popularity":item.get('popularity',0),
                     "image":images[0]['url'] if images else None,
-                    "followers":item.get('followers',{}).get('total',0)})
+                    "followers": (item.get("followers") or {}).get("total", 0)})
         return jsonify(out)
     except Exception as e: return jsonify({"error":str(e)}),500
 
@@ -1852,6 +1967,105 @@ def user_playlists():
                 })
             url = body.get('next')
         return jsonify(playlists)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# master vault routes
+@app.route('/api/master_vault/list')
+def master_vault_list():
+    try:
+        with _master_db() as c:
+            rows = c.execute("SELECT id, song, artist, energy, valence, danceability, bpm, key, mode, source, added_at FROM master_vault ORDER BY rowid DESC").fetchall()
+        out = []
+        for r in rows:
+            out.append({
+                "id": r["id"], "song": r["song"], "artist": r["artist"],
+                "energy": r["energy"], "valence": r["valence"],
+                "danceability": r["danceability"], "bpm": r["bpm"],
+                "camelot": get_camelot(r["key"], r["mode"]),
+                "source": r["source"], "added_at": r["added_at"],
+            })
+        return jsonify({"tracks": out, "count": len(out)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/master_vault/sync', methods=['POST'])
+def master_vault_sync():
+    playlist_id = (request.json or {}).get('playlist_id', '').strip()
+    if not playlist_id:
+        return jsonify({"error": "No playlist_id provided"}), 400
+    token = get_spotify_token()
+    if not token:
+        return jsonify({"error": "Spotify auth failed"}), 401
+    try:
+        all_items = fetch_playlist_tracks(playlist_id, token,
+            fields="items(item(id,name,artists),track(id,name,artists)),next")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    with _master_db() as c:
+        existing = set(r[0] for r in c.execute("SELECT id FROM master_vault").fetchall())
+
+    to_fetch = []
+    track_meta = {}
+    for pl in all_items:
+        t = pl.get('item') or pl.get('track')
+        if t and t.get('id') and t['id'] not in existing:
+            to_fetch.append(t['id'])
+            track_meta[t['id']] = t
+
+    added, ghosted = 0, 0
+    for i in range(0, len(to_fetch), 40):
+        chunk = to_fetch[i:i+40]
+        bd = fetch_reccobeats_batch(chunk)
+        rows = []
+        for tid in chunk:
+            meta = track_meta[tid]
+            feat = bd.get(tid, {})
+            song   = meta.get('name', '')
+            artist = meta['artists'][0]['name'] if meta.get('artists') else ''
+            if feat:
+                rows.append((tid, song, artist,
+                    float(feat.get('energy', 0)), float(feat.get('valence', 0)),
+                    float(feat.get('danceability', 0)), float(feat.get('bpm', 0)),
+                    float(feat.get('acousticness', 0)), float(feat.get('instrumentalness', 0)),
+                    float(feat.get('loudness', 0)),
+                    int(feat.get('key', -1)), int(feat.get('mode', 1)),
+                    'reccobeats', datetime.now().strftime('%Y-%m-%d')))
+                added += 1
+            else:
+                rows.append((tid, song, artist, 0, 0, 0, 0, 0, 0, 0, -1, 1,
+                    'ghost', datetime.now().strftime('%Y-%m-%d')))
+                ghosted += 1
+        if rows:
+            with _master_db() as c:
+                c.executemany("""INSERT OR IGNORE INTO master_vault
+                    (id,song,artist,energy,valence,danceability,bpm,
+                     acousticness,instrumentalness,loudness,key,mode,source,added_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
+                c.commit()
+
+    return jsonify({"success": True, "added": added, "ghost": ghosted,
+        "already": len(all_items) - len(to_fetch),
+        "message": f"MASTER VAULT — {added} indexed, {ghosted} ghost, {len(all_items)-len(to_fetch)} already cached."})
+
+@app.route('/api/master_vault/clear', methods=['POST'])
+def master_vault_clear():
+    try:
+        with _master_db() as c:
+            c.execute("DELETE FROM master_vault")
+            c.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/master_vault/stats')
+def master_vault_stats():
+    try:
+        with _master_db() as c:
+            total = c.execute("SELECT COUNT(*) FROM master_vault").fetchone()[0]
+            ghost = c.execute("SELECT COUNT(*) FROM master_vault WHERE source='ghost'").fetchone()[0]
+        return jsonify({"total": total, "ghost": ghost, "indexed": total - ghost})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
